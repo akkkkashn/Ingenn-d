@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Svenska Tränaren</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🇸🇪 Svenska Tränaren</h1>
+    <p class="subtitle">Practice Swedish with AI feedback</p>
+  </header>
+
+  <nav id="mode-tabs">
+    <button class="tab active" data-mode="situation-respond">Situation → Respond</button>
+    <button class="tab" data-mode="correct-me">I Write → Correct Me</button>
+    <button class="tab" data-mode="conversation">Conversation</button>
+    <button class="tab" data-mode="rewrite">Rewrite This</button>
+    <button class="tab tab-stats" data-mode="stats">My Progress</button>
+  </nav>
+
+  <main>
+    <!-- Situation → Respond -->
+    <section id="panel-situation-respond" class="panel active">
+      <div class="mode-description">
+        <p>You'll get a situation in English. Respond in Swedish as if you're living it.</p>
+      </div>
+      <div class="situation-box">
+        <button id="new-situation" class="btn-secondary">🎲 New Situation</button>
+        <p id="situation-text" class="situation-prompt">Click "New Situation" to begin!</p>
+      </div>
+      <div class="input-area">
+        <textarea id="input-situation" placeholder="Write your Swedish response here..."></textarea>
+        <button class="btn-primary send-btn" data-mode="situation-respond">Send</button>
+      </div>
+      <div id="feedback-situation-respond" class="feedback-area"></div>
+    </section>
+
+    <!-- I Write → Correct Me -->
+    <section id="panel-correct-me" class="panel">
+      <div class="mode-description">
+        <p>Write anything in Swedish. Claude will correct your mistakes and teach you.</p>
+      </div>
+      <div class="input-area">
+        <textarea id="input-correct" placeholder="Skriv något på svenska..."></textarea>
+        <button class="btn-primary send-btn" data-mode="correct-me">Send</button>
+      </div>
+      <div id="feedback-correct-me" class="feedback-area"></div>
+    </section>
+
+    <!-- Conversation -->
+    <section id="panel-conversation" class="panel">
+      <div class="mode-description">
+        <p>Have a conversation in Swedish. Claude will reply naturally and gently correct mistakes.</p>
+      </div>
+      <div id="conversation-log" class="conversation-log"></div>
+      <div class="input-area">
+        <textarea id="input-conversation" placeholder="Skriv på svenska... (start any topic!)"></textarea>
+        <button class="btn-primary send-btn" data-mode="conversation">Send</button>
+      </div>
+      <button id="clear-conversation" class="btn-secondary btn-small">Clear Conversation</button>
+    </section>
+
+    <!-- Rewrite This -->
+    <section id="panel-rewrite" class="panel">
+      <div class="mode-description">
+        <p>Write something in English, and learn how to say it in Swedish with a full breakdown.</p>
+      </div>
+      <div class="input-area">
+        <textarea id="input-rewrite" placeholder="Write in English what you want to say in Swedish..."></textarea>
+        <button class="btn-primary send-btn" data-mode="rewrite">Send</button>
+      </div>
+      <div id="feedback-rewrite" class="feedback-area"></div>
+    </section>
+
+    <!-- Stats -->
+    <section id="panel-stats" class="panel">
+      <div class="stats-container">
+        <div class="stats-section">
+          <h2>Stolen Phrases</h2>
+          <p class="stats-hint">Useful Swedish phrases collected from your sessions</p>
+          <div id="stolen-phrases-list" class="stats-list"></div>
+          <button id="clear-phrases" class="btn-secondary btn-small">Clear All Phrases</button>
+        </div>
+        <div class="stats-section">
+          <h2>Mistake Log</h2>
+          <p class="stats-hint">Track your recurring mistakes to improve faster</p>
+          <div id="mistakes-list" class="stats-list"></div>
+          <button id="clear-mistakes" class="btn-secondary btn-small">Clear All Mistakes</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="spinner"></div>
+    <p>Claude is thinking...</p>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
