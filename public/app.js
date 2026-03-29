@@ -190,7 +190,7 @@ async function handleSend(mode) {
           content: `Situation: ${currentSituation}\n\nMy response: ${userText}`
         }]);
         renderSituationResponse(msgsId, data);
-        saveProgress(data.stolen_phrases, data.mistakes);
+        saveProgress(null, data.mistakes);
         currentSituation = "";
       } else {
         // General chat
@@ -201,12 +201,11 @@ async function handleSend(mode) {
         } else {
           let html = `<div>${esc(data.reply)}</div>`;
           if (data.stolen_phrases && data.stolen_phrases.length > 0) {
-            html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
+            html += phraseTags(data.stolen_phrases);
           }
           addRichBubble(msgsId, html);
           chatHistory.push({ role: "assistant", content: data.reply });
         }
-        saveProgress(data.stolen_phrases, null);
       }
     } else if (mode === "lab") {
       const data = await apiChat("lab", [{ role: "user", content: userText }]);
@@ -214,7 +213,7 @@ async function handleSend(mode) {
         addBubble(msgsId, "assistant", data.raw);
       } else {
         renderLabResponse(msgsId, data);
-        saveProgress(data.stolen_phrases, data.corrections);
+        saveProgress(null, data.corrections);
       }
     }
   } catch (err) {
@@ -247,6 +246,37 @@ function esc(str) {
   d.textContent = str;
   return d.innerHTML;
 }
+
+// --- Clickable phrase tags ---
+function phraseTags(phrases) {
+  if (!phrases || phrases.length === 0) return "";
+  return `<div class="phrases">${phrases.map((p) =>
+    `<span class="phrase-tag phrase-tag-save" data-phrase="${esc(p)}">${esc(p)}</span>`
+  ).join("")}</div>`;
+}
+
+// Delegate click handler for phrase tags
+document.addEventListener("click", async (e) => {
+  const tag = e.target.closest(".phrase-tag-save");
+  if (!tag || !loggedIn) return;
+
+  const phrase = tag.dataset.phrase;
+  if (tag.classList.contains("phrase-saved")) return;
+
+  tag.classList.add("phrase-saved");
+  tag.textContent = "Saved!";
+
+  await fetch("/api/progress/phrases", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phrases: [phrase] }),
+  });
+
+  setTimeout(() => {
+    tag.textContent = phrase;
+    tag.classList.remove("phrase-tag-save");
+  }, 1500);
+});
 
 // --- Renderers ---
 
@@ -285,9 +315,9 @@ function renderLabResponse(msgsId, data) {
     html += `<div class="note">${esc(data.grammar_note)}</div>`;
   }
 
-  // Phrases
+  // Phrases — clickable to save
   if (data.stolen_phrases && data.stolen_phrases.length > 0) {
-    html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
+    html += phraseTags(data.stolen_phrases);
   }
 
   html += `</div>`;
@@ -318,7 +348,7 @@ function renderSituationResponse(msgsId, data) {
   }
 
   if (data.stolen_phrases && data.stolen_phrases.length > 0) {
-    html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
+    html += phraseTags(data.stolen_phrases);
   }
 
   addRichBubble(msgsId, html);

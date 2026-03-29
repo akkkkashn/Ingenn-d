@@ -322,6 +322,25 @@ body {
   padding: 0.2rem 0.55rem;
   border-radius: 12px;
   font-size: 0.78rem;
+  transition: all 0.2s;
+}
+
+.phrase-tag-save {
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.phrase-tag-save:hover {
+  background: rgba(0,106,167,0.35);
+  border-color: var(--accent-hover);
+}
+
+.phrase-tag-save:active { transform: scale(0.95); }
+
+.phrase-tag.phrase-saved {
+  background: rgba(52,211,153,0.2);
+  color: var(--green);
+  cursor: default;
 }
 
 .bubble .grammar-note {
