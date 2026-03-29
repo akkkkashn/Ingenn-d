@@ -345,28 +345,57 @@ body {
   margin-top: 0.3rem;
 }
 
-/* Situation bar */
-.situation-bar {
-  padding: 0.5rem 1rem;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.btn-situation {
-  width: 100%;
-  padding: 0.6rem;
+/* Situation button inline in header */
+.btn-situation-inline {
+  padding: 0.3rem 0.7rem;
   background: var(--surface2);
   color: var(--yellow);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-radius: 20px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   font-weight: 600;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
-.btn-situation:hover { border-color: var(--yellow); }
+.btn-situation-inline:hover { border-color: var(--yellow); background: rgba(254,204,2,0.1); }
+
+/* Lab formal/casual cards */
+.lab-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.lab-card {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+}
+
+.lab-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
+.lab-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 8px;
+}
+
+.lab-badge-formal { background: rgba(0,106,167,0.2); color: var(--accent-hover); }
+.lab-badge-casual { background: rgba(254,204,2,0.15); color: var(--yellow); }
+
+.lab-card .lab-text { font-size: 1.05rem; color: var(--yellow); font-weight: 500; }
+.lab-card .lab-translation { font-size: 0.85rem; color: var(--text-dim); font-style: italic; margin-top: 0.15rem; }
+.lab-card .lab-context { font-size: 0.78rem; color: var(--text-dim); margin-top: 0.2rem; }
 
 /* Input bar */
 .chat-input-bar {

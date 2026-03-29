@@ -1,30 +1,9 @@
 // --- State ---
 let loggedIn = false;
-const conversationHistory = [];
+const chatHistory = [];
+let awaitingSituationResponse = false;
 let currentSituation = "";
-
-const SITUATIONS = [
-  "You're at a cafe in Stockholm and want to order a coffee and a cinnamon bun.",
-  "You're lost in Gothenburg and need to ask someone for directions to the train station.",
-  "You're at a job interview and the interviewer asks you to describe your strengths.",
-  "You're calling to book a table for four at a restaurant for Friday evening.",
-  "You're at the doctor and need to explain that you have a sore throat and a headache.",
-  "You're at a party and someone introduces themselves. Make small talk.",
-  "You're checking into a hotel and there's a problem with your reservation.",
-  "You're at the grocery store and can't find the bread. Ask an employee for help.",
-  "You're returning an item at a clothing store because it's the wrong size.",
-  "A Swedish colleague asks what you did over the weekend. Tell them.",
-  "You're at a fika and your friend asks about your family. Describe them.",
-  "You just moved to Sweden and need to register at Skatteverket. Explain your situation.",
-  "You're at Systembolaget and want a recommendation for a good Swedish beer.",
-  "You bump into your neighbor and they invite you to a midsummer celebration. Respond.",
-  "You're on a train and the person next to you starts chatting about the weather.",
-  "You need to call your landlord because the heating in your apartment is broken.",
-  "You're at a museum and want to ask about student discounts and opening hours.",
-  "A friend is feeling sad. Comfort them and suggest doing something fun together.",
-  "You're applying for a Swedish language course and need to describe your current level.",
-  "You're at IKEA and need help finding a specific piece of furniture.",
-];
+let cachedPhraseTranslations = {};
 
 // --- DOM ---
 const $ = (sel) => document.querySelector(sel);
@@ -84,14 +63,11 @@ $("#btn-register").addEventListener("click", async () => {
   } catch { showAuthError("Connection error"); }
 });
 
-// Enter key on password field
 $("#auth-password").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("#btn-login").click();
 });
 
-function showAuthError(msg) {
-  $("#auth-error").textContent = msg;
-}
+function showAuthError(msg) { $("#auth-error").textContent = msg; }
 
 function showApp(username) {
   $("#auth-screen").classList.remove("active");
@@ -100,7 +76,6 @@ function showApp(username) {
   loadProgress();
 }
 
-// Logout
 $("#btn-logout").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });
   loggedIn = false;
@@ -112,7 +87,6 @@ $("#btn-logout").addEventListener("click", async () => {
   $("#user-menu-dropdown").classList.add("hidden");
 });
 
-// User menu toggle
 $("#user-menu-btn").addEventListener("click", (e) => {
   e.stopPropagation();
   $("#user-menu-dropdown").classList.toggle("hidden");
@@ -135,10 +109,28 @@ $$(".nav-btn").forEach((btn) => {
   });
 });
 
-// --- Situations ---
-$("#new-situation").addEventListener("click", () => {
-  currentSituation = SITUATIONS[Math.floor(Math.random() * SITUATIONS.length)];
-  addBubble("msgs-situation-respond", "system", currentSituation);
+// --- Situation button in chat header ---
+$("#btn-situation").addEventListener("click", async () => {
+  $("#loading-overlay").classList.remove("hidden");
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "chat-situation", messages: [{ role: "user", content: "Give me a situation." }] }),
+    });
+    const data = await res.json();
+    if (data.situation) {
+      currentSituation = data.situation;
+      awaitingSituationResponse = true;
+      let html = `<div class="label">Situation</div><div>${esc(data.situation)}</div>`;
+      if (data.hint) html += `<div class="note">Hint: ${esc(data.hint)}</div>`;
+      addRichBubble("msgs-chat", html);
+    }
+  } catch (err) {
+    addBubble("msgs-chat", "system", "Error: " + err.message);
+  } finally {
+    $("#loading-overlay").classList.add("hidden");
+  }
 });
 
 // --- Send buttons ---
@@ -146,7 +138,7 @@ $$(".send-btn").forEach((btn) => {
   btn.addEventListener("click", () => handleSend(btn.dataset.mode));
 });
 
-// Enter to send (no shift)
+// Enter to send
 $$(".chat-input-bar textarea").forEach((ta) => {
   ta.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -178,73 +170,59 @@ async function apiChat(mode, messages) {
 
 // --- Handle Send ---
 async function handleSend(mode) {
-  let userText, messages;
-  const inputMap = {
-    "conversation": "#input-conversation",
-    "correct-me": "#input-correct",
-    "situation-respond": "#input-situation",
-    "rewrite": "#input-rewrite",
-    "translate": "#input-translate",
-  };
-
+  const inputMap = { "chat": "#input-chat", "lab": "#input-lab" };
   const input = $(inputMap[mode]);
-  userText = input.value.trim();
+  const userText = input.value.trim();
   if (!userText) return;
-  if (mode === "situation-respond" && !currentSituation) return;
 
-  // Show user bubble
   const msgsId = `msgs-${mode}`;
   addBubble(msgsId, "user", userText);
   input.value = "";
   input.style.height = "auto";
 
-  // Build messages
-  switch (mode) {
-    case "situation-respond":
-      messages = [{ role: "user", content: `Situation: ${currentSituation}\n\nMy response: ${userText}` }];
-      break;
-    case "conversation":
-      conversationHistory.push({ role: "user", content: userText });
-      messages = [...conversationHistory];
-      break;
-    default:
-      messages = [{ role: "user", content: userText }];
-  }
-
   try {
-    const data = await apiChat(mode, messages);
-
-    if (data.raw) {
-      addBubble(msgsId, "assistant", data.raw);
-      return;
-    }
-
-    switch (mode) {
-      case "conversation":
-        renderConvResponse(msgsId, data);
-        break;
-      case "correct-me":
-        renderCorrectionResponse(msgsId, data);
-        break;
-      case "situation-respond":
+    if (mode === "chat") {
+      // Check if responding to a situation
+      if (awaitingSituationResponse && currentSituation) {
+        awaitingSituationResponse = false;
+        const data = await apiChat("chat-situation-respond", [{
+          role: "user",
+          content: `Situation: ${currentSituation}\n\nMy response: ${userText}`
+        }]);
         renderSituationResponse(msgsId, data);
-        break;
-      case "rewrite":
-        renderRewriteResponse(msgsId, data);
-        break;
-      case "translate":
-        renderTranslateResponse(msgsId, data);
-        break;
+        saveProgress(data.stolen_phrases, data.mistakes);
+        currentSituation = "";
+      } else {
+        // General chat
+        chatHistory.push({ role: "user", content: userText });
+        const data = await apiChat("chat", [...chatHistory]);
+        if (data.raw) {
+          addBubble(msgsId, "assistant", data.raw);
+        } else {
+          let html = `<div>${esc(data.reply)}</div>`;
+          if (data.stolen_phrases && data.stolen_phrases.length > 0) {
+            html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
+          }
+          addRichBubble(msgsId, html);
+          chatHistory.push({ role: "assistant", content: data.reply });
+        }
+        saveProgress(data.stolen_phrases, null);
+      }
+    } else if (mode === "lab") {
+      const data = await apiChat("lab", [{ role: "user", content: userText }]);
+      if (data.raw) {
+        addBubble(msgsId, "assistant", data.raw);
+      } else {
+        renderLabResponse(msgsId, data);
+        saveProgress(data.stolen_phrases, data.corrections);
+      }
     }
-
-    // Save progress server-side
-    saveProgress(data.stolen_phrases, data.mistakes || data.corrections);
   } catch (err) {
     addBubble(msgsId, "system", "Error: " + err.message);
   }
 }
 
-// --- Bubble helper ---
+// --- Bubble helpers ---
 function addBubble(containerId, type, text) {
   const container = $(`#${containerId}`);
   const div = document.createElement("div");
@@ -252,7 +230,6 @@ function addBubble(containerId, type, text) {
   div.textContent = text;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
-  return div;
 }
 
 function addRichBubble(containerId, html) {
@@ -273,32 +250,51 @@ function esc(str) {
 
 // --- Renderers ---
 
-function renderConvResponse(msgsId, data) {
-  let html = "";
+function renderLabResponse(msgsId, data) {
+  let html = `<div class="lab-result">`;
 
+  // Corrections first
   if (data.corrections && data.corrections.length > 0) {
     html += data.corrections.map((c) =>
       `<div class="correction"><span class="orig">${esc(c.original)}</span> &rarr; <span class="fix">${esc(c.corrected)}</span><span class="expl">${esc(c.explanation)}</span></div>`
     ).join("");
   }
 
-  html += `<div class="swedish">${esc(data.reply_swedish)}</div>`;
-  html += `<div class="translation-text">${esc(data.reply_english)}</div>`;
-
-  if (data.feedback) {
-    html += `<div class="note">${esc(data.feedback)}</div>`;
+  // Formal card
+  if (data.formal) {
+    html += `<div class="lab-card">
+      <div class="lab-card-header"><span class="lab-badge lab-badge-formal">Formal</span></div>
+      <div class="lab-text">${esc(data.formal.text)}</div>
+      <div class="lab-translation">${esc(data.formal.translation)}</div>
+      <div class="lab-context">${esc(data.formal.context)}</div>
+    </div>`;
   }
 
+  // Casual card
+  if (data.casual) {
+    html += `<div class="lab-card">
+      <div class="lab-card-header"><span class="lab-badge lab-badge-casual">Casual / Slang</span></div>
+      <div class="lab-text">${esc(data.casual.text)}</div>
+      <div class="lab-translation">${esc(data.casual.translation)}</div>
+      <div class="lab-context">${esc(data.casual.context)}</div>
+    </div>`;
+  }
+
+  // Grammar note
+  if (data.grammar_note) {
+    html += `<div class="note">${esc(data.grammar_note)}</div>`;
+  }
+
+  // Phrases
   if (data.stolen_phrases && data.stolen_phrases.length > 0) {
     html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
   }
 
+  html += `</div>`;
   addRichBubble(msgsId, html);
-
-  conversationHistory.push({ role: "assistant", content: data.reply_swedish });
 }
 
-function renderCorrectionResponse(msgsId, data) {
+function renderSituationResponse(msgsId, data) {
   let html = "";
 
   if (data.rating) {
@@ -323,51 +319,6 @@ function renderCorrectionResponse(msgsId, data) {
 
   if (data.stolen_phrases && data.stolen_phrases.length > 0) {
     html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
-  }
-
-  addRichBubble(msgsId, html);
-}
-
-function renderSituationResponse(msgsId, data) {
-  renderCorrectionResponse(msgsId, data);
-}
-
-function renderRewriteResponse(msgsId, data) {
-  let html = "";
-
-  html += `<div class="label">Swedish</div><div class="swedish">${esc(data.swedish)}</div>`;
-  html += `<div class="label">Breakdown</div><div>${esc(data.literal_breakdown)}</div>`;
-
-  if (data.grammar_notes && data.grammar_notes.length > 0) {
-    html += `<div class="label">Grammar</div>`;
-    html += data.grammar_notes.map((n) => `<div class="grammar-note">${esc(n)}</div>`).join("");
-  }
-
-  if (data.alternatives && data.alternatives.length > 0) {
-    html += `<div class="label">Alternatives</div>`;
-    html += data.alternatives.map((a) => `<div class="alt">${esc(a)}</div>`).join("");
-  }
-
-  if (data.stolen_phrases && data.stolen_phrases.length > 0) {
-    html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
-  }
-
-  addRichBubble(msgsId, html);
-}
-
-function renderTranslateResponse(msgsId, data) {
-  let html = "";
-
-  const dir = data.detected_language === "swedish" ? "SV &rarr; EN" : "EN &rarr; SV";
-  html += `<div class="label">${dir}</div>`;
-  html += `<div class="swedish">${esc(data.translation)}</div>`;
-
-  if (data.literal) {
-    html += `<div class="label">Literal</div><div class="translation-text">${esc(data.literal)}</div>`;
-  }
-
-  if (data.notes) {
-    html += `<div class="note">${esc(data.notes)}</div>`;
   }
 
   addRichBubble(msgsId, html);
@@ -402,11 +353,7 @@ async function loadProgress() {
   } catch {}
 }
 
-function renderStats() {
-  loadProgress();
-}
-
-let cachedPhraseTranslations = {};
+function renderStats() { loadProgress(); }
 
 function renderStatsData(data) {
   const phrasesList = $("#stolen-phrases-list");
@@ -426,21 +373,16 @@ function renderStatsData(data) {
     </div>`)
     .join("");
 
-  // Lazy-load translations for phrases that don't have one yet
   for (const p of data.phrases) {
-    if (!cachedPhraseTranslations[p.phrase]) {
-      translatePhraseForList(p.phrase);
-    }
+    if (!cachedPhraseTranslations[p.phrase]) translatePhraseForList(p.phrase);
   }
 
-  // Delete individual phrase buttons
   phrasesList.querySelectorAll(".phrase-delete").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const phrase = btn.dataset.phrase;
       await fetch("/api/progress/phrases/" + encodeURIComponent(phrase), { method: "DELETE" });
       btn.closest(".phrase-item").remove();
-      const count = phrasesList.querySelectorAll(".phrase-item").length;
-      $("#phrase-count").textContent = count;
+      $("#phrase-count").textContent = phrasesList.querySelectorAll(".phrase-item").length;
     });
   });
 
@@ -459,9 +401,7 @@ async function translatePhraseForList(phrase) {
     if (!res.ok) return;
     const data = await res.json();
     cachedPhraseTranslations[phrase] = data.translation;
-    // Update the UI if still visible
-    const items = $$("#stolen-phrases-list .phrase-item");
-    for (const item of items) {
+    for (const item of $$("#stolen-phrases-list .phrase-item")) {
       if (item.querySelector(".phrase-sv")?.textContent === phrase) {
         item.querySelector(".phrase-en").textContent = data.translation;
       }
@@ -469,24 +409,20 @@ async function translatePhraseForList(phrase) {
   } catch {}
 }
 
-// Select all phrases
 $("#select-all-phrases").addEventListener("click", () => {
   const boxes = $$("#stolen-phrases-list input[type='checkbox']");
   const allChecked = [...boxes].every((b) => b.checked);
   boxes.forEach((b) => (b.checked = !allChecked));
 });
 
-// Delete selected phrases
 $("#delete-selected-phrases").addEventListener("click", async () => {
   const checked = $$("#stolen-phrases-list input[type='checkbox']:checked");
   if (checked.length === 0) return;
   for (const box of checked) {
-    const phrase = box.dataset.phrase;
-    await fetch("/api/progress/phrases/" + encodeURIComponent(phrase), { method: "DELETE" });
+    await fetch("/api/progress/phrases/" + encodeURIComponent(box.dataset.phrase), { method: "DELETE" });
     box.closest(".phrase-item").remove();
   }
-  const count = $$("#stolen-phrases-list .phrase-item").length;
-  $("#phrase-count").textContent = count;
+  $("#phrase-count").textContent = $$("#stolen-phrases-list .phrase-item").length;
 });
 
 $("#clear-phrases").addEventListener("click", async () => {
@@ -548,7 +484,6 @@ $("#btn-generate-report").addEventListener("click", async () => {
   btn.textContent = "Generating report...";
   preview.classList.add("hidden");
 
-  // Remove old print container
   const old = document.getElementById("print-report-container");
   if (old) old.remove();
 
@@ -568,16 +503,13 @@ $("#btn-generate-report").addEventListener("click", async () => {
       <button class="btn-print" id="btn-print-report">Print / Save as PDF</button>
     </div>` + buildReportPreview(report);
 
-    // Create hidden print container at body root
     const printDiv = document.createElement("div");
     printDiv.id = "print-report-container";
     printDiv.style.display = "none";
     printDiv.innerHTML = `<div id="print-report">${buildPrintReport(report)}</div>`;
     document.body.appendChild(printDiv);
 
-    $("#btn-print-report").addEventListener("click", () => {
-      window.print();
-    });
+    $("#btn-print-report").addEventListener("click", () => window.print());
   } catch (err) {
     preview.classList.remove("hidden");
     preview.innerHTML = `<p style="color:var(--red)">Error: ${esc(err.message)}</p>`;
@@ -628,7 +560,6 @@ function buildReportPreview(r) {
 
   if (r.phrases_list && r.phrases_list.length > 0) {
     html += `<div class="label" style="margin-top:1rem">My Stolen Phrases</div>`;
-    html += `<div style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0.3rem">${r.phrases_list.length} phrases collected</div>`;
     for (const p of r.phrases_list.slice(0, 20)) {
       const tr = cachedPhraseTranslations[p] || "";
       html += `<div style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
@@ -642,53 +573,34 @@ function buildReportPreview(r) {
 }
 
 function buildPrintReport(r) {
-  let html = "";
-  html += `<h1>Svenska Tranaren</h1>`;
+  let html = `<h1>Svenska Tranaren</h1>`;
   html += `<div class="rpt-meta">${esc(r.date)} | ${esc(r.username)} | ${r.total_mistakes} mistakes tracked</div>`;
 
   if (r.phrase_of_day) {
     const p = r.phrase_of_day;
-    html += `<div class="rpt-potd">
-      <h2>Phrase of the Day</h2>
-      <div class="rpt-potd-phrase">${esc(p.phrase)}</div>
-      <div>${esc(p.meaning)}</div>
-      <div style="margin-top:3pt"><em>${esc(p.example_swedish)}</em> — ${esc(p.example_english)}</div>
-    </div>`;
+    html += `<div class="rpt-potd"><h2>Phrase of the Day</h2><div class="rpt-potd-phrase">${esc(p.phrase)}</div><div>${esc(p.meaning)}</div><div style="margin-top:3pt"><em>${esc(p.example_swedish)}</em> — ${esc(p.example_english)}</div></div>`;
   }
 
   if (r.macro_en) {
-    html += `<h2>Key Issues</h2>`;
-    html += `<div class="rpt-block-en">${esc(r.macro_en)}</div>`;
-    html += `<div class="rpt-block-sv">${esc(r.macro_sv)}</div>`;
+    html += `<h2>Key Issues</h2><div class="rpt-block-en">${esc(r.macro_en)}</div><div class="rpt-block-sv">${esc(r.macro_sv)}</div>`;
   }
 
   if (r.top_mistakes && r.top_mistakes.length > 0) {
     html += `<h2>Mistake Patterns</h2>`;
     for (const m of r.top_mistakes) {
-      html += `<div class="rpt-pattern">`;
-      html += `<strong>${esc(m.pattern)}</strong><br>`;
-      if (m.examples) {
-        for (const e of m.examples) {
-          html += `<span class="rpt-example">${esc(e)}</span> `;
-        }
-        html += `<br>`;
-      }
-      html += `<div class="rpt-block-en">${esc(m.rule_en)}</div>`;
-      html += `<div class="rpt-block-sv">${esc(m.rule_sv)}</div>`;
-      html += `</div>`;
+      html += `<div class="rpt-pattern"><strong>${esc(m.pattern)}</strong><br>`;
+      if (m.examples) { for (const e of m.examples) html += `<span class="rpt-example">${esc(e)}</span> `; html += `<br>`; }
+      html += `<div class="rpt-block-en">${esc(m.rule_en)}</div><div class="rpt-block-sv">${esc(m.rule_sv)}</div></div>`;
     }
   }
 
   if (r.focus && r.focus.length > 0) {
     html += `<h2>Focus Areas</h2>`;
-    for (const f of r.focus) {
-      html += `<div class="rpt-focus">• ${esc(f)}</div>`;
-    }
+    for (const f of r.focus) html += `<div class="rpt-focus">• ${esc(f)}</div>`;
   }
 
   if (r.phrases_list && r.phrases_list.length > 0) {
-    html += `<h2>Stolen Phrases (${r.phrases_list.length})</h2>`;
-    html += `<div class="rpt-phrases">`;
+    html += `<h2>Stolen Phrases (${r.phrases_list.length})</h2><div class="rpt-phrases">`;
     for (const p of r.phrases_list) {
       const tr = cachedPhraseTranslations[p] || "";
       html += `<div class="rpt-phrase-item"><span class="rpt-phrase-sv">${esc(p)}</span> ${tr ? `<span class="rpt-phrase-en">— ${esc(tr)}</span>` : ""}</div>`;
@@ -708,15 +620,11 @@ document.addEventListener("touchend", handleTextSelect);
 function handleTextSelect() {
   const sel = window.getSelection();
   const text = sel.toString().trim();
-  if (text.length < 2 || text.length > 500) {
-    return;
-  }
-  // Only trigger inside chat panels or report
+  if (text.length < 2 || text.length > 500) return;
+
   const anchor = sel.anchorNode;
-  if (!anchor) return;
-  const parent = anchor.parentElement;
-  if (!parent) return;
-  const inApp = parent.closest(".chat-messages, .bubble, .report-preview, .potd-card, .stats-content");
+  if (!anchor || !anchor.parentElement) return;
+  const inApp = anchor.parentElement.closest(".chat-messages, .bubble, .report-preview, .potd-card, .stats-content");
   if (!inApp) return;
 
   selectedText = text;
@@ -762,7 +670,6 @@ $("#select-add-phrase").addEventListener("click", async () => {
   });
   $("#select-popup").classList.add("hidden");
   window.getSelection().removeAllRanges();
-  // Brief visual confirmation
   const btn = $("#select-add-phrase");
   btn.textContent = "Added!";
   setTimeout(() => { btn.textContent = "Add to Stolen Phrases"; }, 1500);

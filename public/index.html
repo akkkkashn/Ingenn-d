@@ -29,27 +29,14 @@
   <!-- App Screen -->
   <div id="app-screen" class="screen">
 
-    <!-- Bottom nav tabs (mobile style) -->
     <nav id="bottom-nav">
-      <button class="nav-btn active" data-mode="conversation" title="Conversation">
+      <button class="nav-btn active" data-mode="chat" title="Chat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span>Chat</span>
       </button>
-      <button class="nav-btn" data-mode="correct-me" title="Correct Me">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        <span>Correct</span>
-      </button>
-      <button class="nav-btn" data-mode="situation-respond" title="Situations">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5"/></svg>
-        <span>Situation</span>
-      </button>
-      <button class="nav-btn" data-mode="rewrite" title="Rewrite">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        <span>Rewrite</span>
-      </button>
-      <button class="nav-btn" data-mode="translate" title="Translate">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>
-        <span>Translate</span>
+      <button class="nav-btn" data-mode="lab" title="Lab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6v5.586a1 1 0 0 1 .293.707l3.414 3.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5.586a1 1 0 0 1 .293-.707L8.707 9.293A1 1 0 0 0 9 8.586V3z"/><path d="M9 3h6"/></svg>
+        <span>Lab</span>
       </button>
       <button class="nav-btn" data-mode="daily" title="Daily">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
@@ -61,13 +48,12 @@
       </button>
     </nav>
 
-    <!-- Chat panels — each is a full-screen chat view -->
-
-    <!-- Conversation -->
-    <section id="panel-conversation" class="chat-panel active">
+    <!-- Chat: General Swedish Q&A + Situations -->
+    <section id="panel-chat" class="chat-panel active">
       <div class="chat-header">
-        <h2>Conversation</h2>
-        <span class="header-hint">Chat in Swedish</span>
+        <h2>Chat</h2>
+        <span class="header-hint">Ask anything about Swedish</span>
+        <button id="btn-situation" class="btn-situation-inline" title="Get a situation">Situation</button>
         <button id="user-menu-btn" class="icon-btn" title="Account">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </button>
@@ -76,73 +62,25 @@
         <span id="menu-username" class="menu-user"></span>
         <button id="btn-logout" class="btn-ghost btn-small">Log Out</button>
       </div>
-      <div class="chat-messages" id="msgs-conversation"></div>
+      <div class="chat-messages" id="msgs-chat"></div>
       <div class="chat-input-bar">
-        <textarea id="input-conversation" placeholder="Skriv på svenska..." rows="1"></textarea>
-        <button class="send-btn" data-mode="conversation">
+        <textarea id="input-chat" placeholder="Ask about Swedish, or respond to a situation..." rows="1"></textarea>
+        <button class="send-btn" data-mode="chat">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         </button>
       </div>
     </section>
 
-    <!-- Correct Me -->
-    <section id="panel-correct-me" class="chat-panel">
+    <!-- Lab: Translate / Correct / Rewrite — Formal & Casual -->
+    <section id="panel-lab" class="chat-panel">
       <div class="chat-header">
-        <h2>Correct Me</h2>
-        <span class="header-hint">Write Swedish, get corrections</span>
+        <h2>Lab</h2>
+        <span class="header-hint">Translate, correct, rewrite — formal & slang</span>
       </div>
-      <div class="chat-messages" id="msgs-correct-me"></div>
+      <div class="chat-messages" id="msgs-lab"></div>
       <div class="chat-input-bar">
-        <textarea id="input-correct" placeholder="Skriv något på svenska..." rows="1"></textarea>
-        <button class="send-btn" data-mode="correct-me">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-        </button>
-      </div>
-    </section>
-
-    <!-- Situation Respond -->
-    <section id="panel-situation-respond" class="chat-panel">
-      <div class="chat-header">
-        <h2>Situations</h2>
-        <span class="header-hint">Respond to real-life scenarios</span>
-      </div>
-      <div class="chat-messages" id="msgs-situation-respond"></div>
-      <div class="situation-bar">
-        <button id="new-situation" class="btn-situation">New Situation</button>
-      </div>
-      <div class="chat-input-bar">
-        <textarea id="input-situation" placeholder="Write your Swedish response..." rows="1"></textarea>
-        <button class="send-btn" data-mode="situation-respond">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-        </button>
-      </div>
-    </section>
-
-    <!-- Rewrite -->
-    <section id="panel-rewrite" class="chat-panel">
-      <div class="chat-header">
-        <h2>Rewrite</h2>
-        <span class="header-hint">English in, Swedish out with breakdown</span>
-      </div>
-      <div class="chat-messages" id="msgs-rewrite"></div>
-      <div class="chat-input-bar">
-        <textarea id="input-rewrite" placeholder="Write in English..." rows="1"></textarea>
-        <button class="send-btn" data-mode="rewrite">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-        </button>
-      </div>
-    </section>
-
-    <!-- Translate -->
-    <section id="panel-translate" class="chat-panel">
-      <div class="chat-header">
-        <h2>Translate</h2>
-        <span class="header-hint">Swedish or English, auto-detected</span>
-      </div>
-      <div class="chat-messages" id="msgs-translate"></div>
-      <div class="chat-input-bar">
-        <textarea id="input-translate" placeholder="Type in Swedish or English..." rows="1"></textarea>
-        <button class="send-btn" data-mode="translate">
+        <textarea id="input-lab" placeholder="Write in Swedish or English..." rows="1"></textarea>
+        <button class="send-btn" data-mode="lab">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         </button>
       </div>
@@ -163,7 +101,7 @@
         </div>
         <div class="report-section">
           <h3>Daily Report</h3>
-          <p class="stats-hint">AI-generated analysis of your mistakes and progress. Printable.</p>
+          <p class="stats-hint">AI analysis of your mistakes and patterns. Printable.</p>
           <button id="btn-generate-report" class="btn-primary btn-full">Generate Daily Report</button>
           <div id="report-preview" class="report-preview hidden"></div>
         </div>
