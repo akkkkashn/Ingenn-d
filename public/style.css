@@ -425,6 +425,22 @@ body {
 }
 
 .stats-section { margin-bottom: 1.5rem; }
+
+.stats-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.stats-actions { display: flex; gap: 0.3rem; }
+
+.btn-tiny { font-size: 0.7rem; padding: 0.3rem 0.5rem; border-radius: 8px; }
+.btn-danger { color: var(--red); border-color: var(--red); }
+.btn-danger:hover { background: rgba(248,113,113,0.1); }
+
 .stats-section h3 {
   font-size: 0.95rem;
   margin-bottom: 0.5rem;
@@ -469,6 +485,109 @@ body {
 .stats-item .count { color: var(--text-dim); font-size: 0.75rem; }
 .stats-item .orig { color: var(--red); text-decoration: line-through; }
 .stats-item .fix { color: var(--green); }
+
+/* Phrase items with checkbox + delete */
+.phrase-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.phrase-item:last-child { border-bottom: none; }
+
+.phrase-item input[type="checkbox"] {
+  margin-top: 0.25rem;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
+.phrase-item .phrase-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.phrase-item .phrase-sv {
+  font-size: 0.95rem;
+  color: var(--yellow);
+  font-weight: 500;
+}
+
+.phrase-item .phrase-en {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 0.1rem;
+}
+
+.phrase-item .phrase-delete {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0 0.3rem;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: all 0.2s;
+}
+
+.phrase-item .phrase-delete:hover { color: var(--red); opacity: 1; }
+
+/* ===== SELECTION POPUP ===== */
+.select-popup {
+  position: fixed;
+  bottom: calc(var(--nav-height) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  width: calc(100% - 2rem);
+  max-width: 400px;
+  animation: fadeUp 0.2s ease;
+}
+
+.select-popup-content {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.select-translation { margin-bottom: 0.8rem; }
+
+.select-translation .sel-original {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 0.4rem;
+}
+
+.select-translation .sel-translated {
+  font-size: 1.05rem;
+  color: var(--yellow);
+  font-weight: 500;
+}
+
+.select-translation .sel-context {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 0.3rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--accent);
+}
+
+.select-popup-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.select-popup-actions .btn-primary { flex: 1; }
 
 /* ===== LOADING ===== */
 .loading-overlay {
@@ -597,43 +716,44 @@ body {
 
 /* ===== PRINT STYLES ===== */
 @media print {
-  body { background: white; color: black; }
-  #bottom-nav, .chat-header, .report-actions,
-  .potd-section, .report-section > p,
-  .report-section > button, .btn-print,
-  #loading-overlay { display: none !important; }
+  * { color-adjust: exact; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: white !important; color: black !important; overflow: visible !important; height: auto !important; }
+  html { overflow: visible !important; height: auto !important; }
 
-  .screen, .chat-panel, .report-preview {
+  /* Hide everything except print-report */
+  body > * { display: none !important; }
+  #print-report-container {
     display: block !important;
     position: static !important;
     overflow: visible !important;
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
     background: white !important;
   }
 
-  .stats-content { padding: 0 !important; overflow: visible !important; }
+  #print-report-container * { display: revert; }
 
   #print-report {
-    display: block !important;
     font-family: Georgia, 'Times New Roman', serif;
     color: black;
+    font-size: 10.5pt;
+    line-height: 1.45;
     max-width: 100%;
-    font-size: 11pt;
-    line-height: 1.5;
+    padding: 0;
   }
 
-  #print-report h1 { font-size: 18pt; margin-bottom: 4pt; border-bottom: 2pt solid #006aa7; padding-bottom: 4pt; }
-  #print-report h2 { font-size: 13pt; margin: 12pt 0 4pt; color: #006aa7; }
-  #print-report h3 { font-size: 11pt; margin: 8pt 0 2pt; }
-  #print-report .print-potd { background: #f5f5f5; padding: 8pt; border-left: 3pt solid #fecc02; margin-bottom: 10pt; }
-  #print-report .print-potd .phrase { font-size: 14pt; font-weight: bold; }
-  #print-report .print-mistake { margin-bottom: 6pt; padding-left: 8pt; border-left: 2pt solid #ddd; }
-  #print-report .print-swedish { color: #555; font-style: italic; margin-top: 2pt; }
-  #print-report .print-focus { margin: 2pt 0; padding-left: 12pt; }
-  #print-report .print-meta { font-size: 9pt; color: #999; text-align: right; }
+  #print-report h1 { font-size: 16pt; margin-bottom: 2pt; border-bottom: 2pt solid #006aa7; padding-bottom: 3pt; }
+  #print-report h2 { font-size: 12pt; margin: 10pt 0 3pt; color: #006aa7; }
+  #print-report .rpt-meta { font-size: 8.5pt; color: #999; text-align: right; margin-bottom: 6pt; }
+  #print-report .rpt-potd { background: #f8f8f8; padding: 6pt 8pt; border-left: 3pt solid #fecc02; margin-bottom: 8pt; }
+  #print-report .rpt-potd-phrase { font-size: 13pt; font-weight: bold; }
+  #print-report .rpt-block-en { margin-bottom: 2pt; }
+  #print-report .rpt-block-sv { color: #006aa7; font-style: italic; margin-bottom: 6pt; padding: 4pt 6pt; background: #f0f6fa; border-radius: 3pt; font-size: 10pt; }
+  #print-report .rpt-pattern { margin-bottom: 6pt; padding-left: 8pt; border-left: 2pt solid #ddd; }
+  #print-report .rpt-example { font-family: 'Courier New', monospace; font-size: 9.5pt; color: #333; background: #f5f5f5; padding: 2pt 4pt; border-radius: 2pt; display: inline; }
+  #print-report .rpt-focus { margin: 1pt 0; padding-left: 10pt; }
+  #print-report .rpt-phrases { margin-top: 6pt; }
+  #print-report .rpt-phrase-item { padding: 2pt 0; border-bottom: 0.5pt solid #eee; }
+  #print-report .rpt-phrase-sv { font-weight: 600; }
+  #print-report .rpt-phrase-en { color: #666; font-style: italic; font-size: 9.5pt; }
 }
 
 .hidden { display: none !important; }

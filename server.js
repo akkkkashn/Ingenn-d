@@ -283,32 +283,33 @@ app.get("/api/report", requireAuth, async (req, res) => {
   }
 
   const mistakesSummary = mistakes.slice(0, 15).map((m) => `"${m.original}" → "${m.corrected}" (${m.count}x): ${m.explanation}`).join("\n");
-  const phrasesSummary = phrases.slice(0, 20).map((p) => p.phrase).join(", ");
 
   try {
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 2000,
-      system: `You are a Swedish language tutor writing a concise daily progress report for a student. The report should be printable on one page (front only). Be direct and useful — no fluff.
+      system: `You are a Swedish language tutor writing a concise daily report. Be direct — no fluff, no encouragement filler. Use the student's ACTUAL mistakes as examples throughout.
 
 Reply in this exact JSON format:
 {
   "date": "${today}",
-  "summary_en": "<2-3 sentence overview of their progress and level in English>",
-  "summary_sv": "<same summary translated to Swedish>",
   "top_mistakes": [
-    {"pattern": "<the grammatical/vocabulary pattern they keep getting wrong>", "explanation_en": "<clear explanation in English>", "explanation_sv": "<same explanation in Swedish>", "tip": "<one practical tip to fix it>"}
+    {
+      "pattern": "<short name for the pattern, e.g. 'en/ett confusion'>",
+      "examples": ["<actual mistake from their data: 'en hus' → 'ett hus'"],
+      "rule_en": "<the grammar rule in 1-2 sentences>",
+      "rule_sv": "<same rule in Swedish>"
+    }
   ],
-  "macro_analysis_en": "<1-2 paragraphs: what fundamental areas they struggle with on a macro level — e.g. word order, en/ett system, verb tenses, prepositions. Be specific about WHAT they're getting wrong and WHY>",
-  "macro_analysis_sv": "<same macro analysis in Swedish>",
-  "focus_areas": ["<3-5 specific things they should practice today>"],
-  "encouragement": "<one encouraging sentence about their progress>"
+  "macro_en": "<1 short paragraph: their fundamental weak areas at a macro level. Be specific using their examples.>",
+  "macro_sv": "<same in Swedish>",
+  "focus": ["<3 specific practice points for today>"]
 }
 
-Keep top_mistakes to max 5 entries. Focus on patterns, not individual errors.`,
+Max 4-5 top_mistakes entries. Every pattern MUST include real examples from the student's data. No generic advice.`,
       messages: [{
         role: "user",
-        content: `Here are my mistakes (most frequent first):\n${mistakesSummary}\n\nPhrases I've learned:\n${phrasesSummary}\n\nGenerate my daily report.`
+        content: `My mistakes (most frequent first):\n${mistakesSummary}\n\nGenerate my report.`
       }],
     });
 
@@ -320,12 +321,40 @@ Keep top_mistakes to max 5 entries. Focus on patterns, not individual errors.`,
     report.total_phrases = phrases.length;
     report.total_mistakes = mistakes.length;
     report.username = req.session.username;
+    report.phrases_list = phrases.map((p) => p.phrase);
 
     res.json({ report });
   } catch (err) {
     console.error("Report error:", err.message);
     res.status(500).json({ error: "Failed to generate report", detail: err.message });
   }
+});
+
+// --- Quick translate for text selection ---
+app.post("/api/quick-translate", async (req, res) => {
+  const { text } = req.body;
+  if (!text || text.length > 500) return res.status(400).json({ error: "Invalid text" });
+
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 400,
+      system: `Translate the given text between Swedish and English (auto-detect). Reply in JSON:
+{"translation": "<translated text>", "context": "<one sentence: when/how you'd use this phrase>", "context_sv": "<same context sentence in Swedish>"}`,
+      messages: [{ role: "user", content: text }],
+    });
+    const t = response.content[0].text;
+    const jsonMatch = t.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, t];
+    res.json(JSON.parse(jsonMatch[1].trim()));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Delete individual phrase ---
+app.delete("/api/progress/phrases/:phrase", requireAuth, (req, res) => {
+  db.prepare("DELETE FROM phrases WHERE user_id = ? AND phrase = ?").run(req.session.userId, req.params.phrase);
+  res.json({ ok: true });
 });
 
 app.post("/api/chat", async (req, res) => {

@@ -406,6 +406,8 @@ function renderStats() {
   loadProgress();
 }
 
+let cachedPhraseTranslations = {};
+
 function renderStatsData(data) {
   const phrasesList = $("#stolen-phrases-list");
   const mistakesList = $("#mistakes-list");
@@ -414,22 +416,89 @@ function renderStatsData(data) {
   $("#mistake-count").textContent = data.mistakes.length;
 
   phrasesList.innerHTML = data.phrases
-    .map((p) => `<div class="stats-item">${esc(p.phrase)}</div>`)
+    .map((p) => `<div class="phrase-item">
+      <input type="checkbox" data-phrase="${esc(p.phrase)}">
+      <div class="phrase-text">
+        <div class="phrase-sv">${esc(p.phrase)}</div>
+        <div class="phrase-en">${esc(cachedPhraseTranslations[p.phrase] || "")}</div>
+      </div>
+      <button class="phrase-delete" data-phrase="${esc(p.phrase)}" title="Delete">&times;</button>
+    </div>`)
     .join("");
+
+  // Lazy-load translations for phrases that don't have one yet
+  for (const p of data.phrases) {
+    if (!cachedPhraseTranslations[p.phrase]) {
+      translatePhraseForList(p.phrase);
+    }
+  }
+
+  // Delete individual phrase buttons
+  phrasesList.querySelectorAll(".phrase-delete").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const phrase = btn.dataset.phrase;
+      await fetch("/api/progress/phrases/" + encodeURIComponent(phrase), { method: "DELETE" });
+      btn.closest(".phrase-item").remove();
+      const count = phrasesList.querySelectorAll(".phrase-item").length;
+      $("#phrase-count").textContent = count;
+    });
+  });
 
   mistakesList.innerHTML = data.mistakes
     .map((m) => `<div class="stats-item"><span class="orig">${esc(m.original)}</span> &rarr; <span class="fix">${esc(m.corrected)}</span> <span class="count">(&times;${m.count})</span></div>`)
     .join("");
 }
 
+async function translatePhraseForList(phrase) {
+  try {
+    const res = await fetch("/api/quick-translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: phrase }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    cachedPhraseTranslations[phrase] = data.translation;
+    // Update the UI if still visible
+    const items = $$("#stolen-phrases-list .phrase-item");
+    for (const item of items) {
+      if (item.querySelector(".phrase-sv")?.textContent === phrase) {
+        item.querySelector(".phrase-en").textContent = data.translation;
+      }
+    }
+  } catch {}
+}
+
+// Select all phrases
+$("#select-all-phrases").addEventListener("click", () => {
+  const boxes = $$("#stolen-phrases-list input[type='checkbox']");
+  const allChecked = [...boxes].every((b) => b.checked);
+  boxes.forEach((b) => (b.checked = !allChecked));
+});
+
+// Delete selected phrases
+$("#delete-selected-phrases").addEventListener("click", async () => {
+  const checked = $$("#stolen-phrases-list input[type='checkbox']:checked");
+  if (checked.length === 0) return;
+  for (const box of checked) {
+    const phrase = box.dataset.phrase;
+    await fetch("/api/progress/phrases/" + encodeURIComponent(phrase), { method: "DELETE" });
+    box.closest(".phrase-item").remove();
+  }
+  const count = $$("#stolen-phrases-list .phrase-item").length;
+  $("#phrase-count").textContent = count;
+});
+
 $("#clear-phrases").addEventListener("click", async () => {
   await fetch("/api/progress/phrases", { method: "DELETE" });
-  renderStatsData({ phrases: [], mistakes: (await (await fetch("/api/progress")).json()).mistakes });
+  const data = await (await fetch("/api/progress")).json();
+  renderStatsData({ phrases: [], mistakes: data.mistakes });
 });
 
 $("#clear-mistakes").addEventListener("click", async () => {
   await fetch("/api/progress/mistakes", { method: "DELETE" });
-  renderStatsData({ phrases: (await (await fetch("/api/progress")).json()).phrases, mistakes: [] });
+  const data = await (await fetch("/api/progress")).json();
+  renderStatsData({ phrases: data.phrases, mistakes: [] });
 });
 
 // --- Phrase of the Day ---
@@ -479,6 +548,10 @@ $("#btn-generate-report").addEventListener("click", async () => {
   btn.textContent = "Generating report...";
   preview.classList.add("hidden");
 
+  // Remove old print container
+  const old = document.getElementById("print-report-container");
+  if (old) old.remove();
+
   try {
     const res = await fetch("/api/report");
     if (!res.ok) throw new Error("Failed to generate report");
@@ -491,7 +564,20 @@ $("#btn-generate-report").addEventListener("click", async () => {
     }
 
     preview.classList.remove("hidden");
-    preview.innerHTML = buildReportHtml(report);
+    preview.innerHTML = `<div class="report-actions">
+      <button class="btn-print" id="btn-print-report">Print / Save as PDF</button>
+    </div>` + buildReportPreview(report);
+
+    // Create hidden print container at body root
+    const printDiv = document.createElement("div");
+    printDiv.id = "print-report-container";
+    printDiv.style.display = "none";
+    printDiv.innerHTML = `<div id="print-report">${buildPrintReport(report)}</div>`;
+    document.body.appendChild(printDiv);
+
+    $("#btn-print-report").addEventListener("click", () => {
+      window.print();
+    });
   } catch (err) {
     preview.classList.remove("hidden");
     preview.innerHTML = `<p style="color:var(--red)">Error: ${esc(err.message)}</p>`;
@@ -501,66 +587,186 @@ $("#btn-generate-report").addEventListener("click", async () => {
   }
 });
 
-function buildReportHtml(r) {
-  let html = `<div class="report-actions">
-    <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
-  </div>`;
+function buildReportPreview(r) {
+  let html = "";
 
-  html += `<div id="print-report">`;
-  html += `<h1>Svenska Tranaren — Daily Report</h1>`;
-  html += `<div class="print-meta">${esc(r.date)} | ${esc(r.username)} | ${r.total_phrases} phrases learned | ${r.total_mistakes} mistakes tracked</div>`;
-
-  // Phrase of the Day
   if (r.phrase_of_day) {
     const p = r.phrase_of_day;
-    html += `<div class="print-potd">
-      <h2>Phrase of the Day</h2>
-      <div class="phrase">${esc(p.phrase)}</div>
-      <div>${esc(p.meaning)}</div>
-      <div style="margin-top:4pt"><em>${esc(p.example_swedish)}</em></div>
-      <div style="color:#666">${esc(p.example_english)}</div>
+    html += `<div style="border-left:3px solid var(--yellow);padding-left:0.8rem;margin-bottom:1rem">
+      <div style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;font-weight:600">Phrase of the Day</div>
+      <div style="color:var(--yellow);font-size:1.2rem;font-weight:700">${esc(p.phrase)}</div>
+      <div style="color:var(--text-dim);font-size:0.85rem">${esc(p.meaning)}</div>
     </div>`;
   }
 
-  // Summary
-  html += `<h2>Summary</h2>`;
-  html += `<p>${esc(r.summary_en)}</p>`;
-  html += `<p class="print-swedish">${esc(r.summary_sv)}</p>`;
+  if (r.macro_en) {
+    html += `<div style="margin-bottom:1rem">
+      <div class="label">Key Issues</div>
+      <p style="font-size:0.9rem;margin-bottom:0.4rem">${esc(r.macro_en)}</p>
+      <div style="background:var(--surface);padding:0.6rem 0.8rem;border-radius:8px;border-left:3px solid var(--accent);color:var(--accent-hover);font-style:italic;font-size:0.85rem">${esc(r.macro_sv)}</div>
+    </div>`;
+  }
 
-  // Macro Analysis
-  html += `<h2>What You're Getting Wrong (and Why)</h2>`;
-  html += `<p>${esc(r.macro_analysis_en)}</p>`;
-  html += `<p class="print-swedish">${esc(r.macro_analysis_sv)}</p>`;
-
-  // Top Mistakes
   if (r.top_mistakes && r.top_mistakes.length > 0) {
-    html += `<h2>Recurring Mistake Patterns</h2>`;
+    html += `<div class="label">Mistake Patterns</div>`;
     for (const m of r.top_mistakes) {
-      html += `<div class="print-mistake">
-        <h3>${esc(m.pattern)}</h3>
-        <p>${esc(m.explanation_en)}</p>
-        <p class="print-swedish">${esc(m.explanation_sv)}</p>
-        <p><strong>Tip:</strong> ${esc(m.tip)}</p>
+      html += `<div style="background:var(--surface);border-radius:8px;padding:0.7rem;margin-bottom:0.5rem">
+        <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.3rem">${esc(m.pattern)}</div>
+        ${m.examples ? m.examples.map((e) => `<div style="font-family:monospace;font-size:0.8rem;color:var(--orange);margin-bottom:0.2rem">${esc(e)}</div>`).join("") : ""}
+        <div style="font-size:0.85rem;margin-bottom:0.3rem">${esc(m.rule_en)}</div>
+        <div style="font-size:0.8rem;color:var(--accent-hover);font-style:italic">${esc(m.rule_sv)}</div>
       </div>`;
     }
   }
 
-  // Focus Areas
-  if (r.focus_areas && r.focus_areas.length > 0) {
-    html += `<h2>Today's Focus Areas</h2>`;
-    for (const f of r.focus_areas) {
-      html += `<div class="print-focus">• ${esc(f)}</div>`;
+  if (r.focus && r.focus.length > 0) {
+    html += `<div class="label" style="margin-top:0.8rem">Today's Focus</div>`;
+    for (const f of r.focus) {
+      html += `<div style="font-size:0.85rem;padding:0.2rem 0">• ${esc(f)}</div>`;
     }
   }
 
-  // Encouragement
-  if (r.encouragement) {
-    html += `<p style="margin-top:10pt;font-style:italic">${esc(r.encouragement)}</p>`;
+  if (r.phrases_list && r.phrases_list.length > 0) {
+    html += `<div class="label" style="margin-top:1rem">My Stolen Phrases</div>`;
+    html += `<div style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0.3rem">${r.phrases_list.length} phrases collected</div>`;
+    for (const p of r.phrases_list.slice(0, 20)) {
+      const tr = cachedPhraseTranslations[p] || "";
+      html += `<div style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--yellow)">${esc(p)}</span>
+        ${tr ? `<span style="color:var(--text-dim);font-size:0.8rem;font-style:italic;margin-left:0.4rem">— ${esc(tr)}</span>` : ""}
+      </div>`;
+    }
   }
 
-  html += `</div>`;
   return html;
 }
+
+function buildPrintReport(r) {
+  let html = "";
+  html += `<h1>Svenska Tranaren</h1>`;
+  html += `<div class="rpt-meta">${esc(r.date)} | ${esc(r.username)} | ${r.total_mistakes} mistakes tracked</div>`;
+
+  if (r.phrase_of_day) {
+    const p = r.phrase_of_day;
+    html += `<div class="rpt-potd">
+      <h2>Phrase of the Day</h2>
+      <div class="rpt-potd-phrase">${esc(p.phrase)}</div>
+      <div>${esc(p.meaning)}</div>
+      <div style="margin-top:3pt"><em>${esc(p.example_swedish)}</em> — ${esc(p.example_english)}</div>
+    </div>`;
+  }
+
+  if (r.macro_en) {
+    html += `<h2>Key Issues</h2>`;
+    html += `<div class="rpt-block-en">${esc(r.macro_en)}</div>`;
+    html += `<div class="rpt-block-sv">${esc(r.macro_sv)}</div>`;
+  }
+
+  if (r.top_mistakes && r.top_mistakes.length > 0) {
+    html += `<h2>Mistake Patterns</h2>`;
+    for (const m of r.top_mistakes) {
+      html += `<div class="rpt-pattern">`;
+      html += `<strong>${esc(m.pattern)}</strong><br>`;
+      if (m.examples) {
+        for (const e of m.examples) {
+          html += `<span class="rpt-example">${esc(e)}</span> `;
+        }
+        html += `<br>`;
+      }
+      html += `<div class="rpt-block-en">${esc(m.rule_en)}</div>`;
+      html += `<div class="rpt-block-sv">${esc(m.rule_sv)}</div>`;
+      html += `</div>`;
+    }
+  }
+
+  if (r.focus && r.focus.length > 0) {
+    html += `<h2>Focus Areas</h2>`;
+    for (const f of r.focus) {
+      html += `<div class="rpt-focus">• ${esc(f)}</div>`;
+    }
+  }
+
+  if (r.phrases_list && r.phrases_list.length > 0) {
+    html += `<h2>Stolen Phrases (${r.phrases_list.length})</h2>`;
+    html += `<div class="rpt-phrases">`;
+    for (const p of r.phrases_list) {
+      const tr = cachedPhraseTranslations[p] || "";
+      html += `<div class="rpt-phrase-item"><span class="rpt-phrase-sv">${esc(p)}</span> ${tr ? `<span class="rpt-phrase-en">— ${esc(tr)}</span>` : ""}</div>`;
+    }
+    html += `</div>`;
+  }
+
+  return html;
+}
+
+// --- Text selection popup ---
+let selectedText = "";
+
+document.addEventListener("mouseup", handleTextSelect);
+document.addEventListener("touchend", handleTextSelect);
+
+function handleTextSelect() {
+  const sel = window.getSelection();
+  const text = sel.toString().trim();
+  if (text.length < 2 || text.length > 500) {
+    return;
+  }
+  // Only trigger inside chat panels or report
+  const anchor = sel.anchorNode;
+  if (!anchor) return;
+  const parent = anchor.parentElement;
+  if (!parent) return;
+  const inApp = parent.closest(".chat-messages, .bubble, .report-preview, .potd-card, .stats-content");
+  if (!inApp) return;
+
+  selectedText = text;
+  showSelectionPopup(text);
+}
+
+async function showSelectionPopup(text) {
+  const popup = $("#select-popup");
+  const content = $("#select-translation");
+  popup.classList.remove("hidden");
+  content.innerHTML = `<div class="sel-original">${esc(text)}</div><div style="color:var(--text-dim);font-size:0.8rem">Translating...</div>`;
+
+  try {
+    const res = await fetch("/api/quick-translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new Error("Failed");
+    const data = await res.json();
+
+    content.innerHTML = `
+      <div class="sel-original">${esc(text)}</div>
+      <div class="sel-translated">${esc(data.translation)}</div>
+      <div class="sel-context">${esc(data.context)}<br><em>${esc(data.context_sv)}</em></div>
+    `;
+  } catch {
+    content.innerHTML = `<div class="sel-original">${esc(text)}</div><div style="color:var(--red);font-size:0.85rem">Could not translate</div>`;
+  }
+}
+
+$("#select-close").addEventListener("click", () => {
+  $("#select-popup").classList.add("hidden");
+  window.getSelection().removeAllRanges();
+});
+
+$("#select-add-phrase").addEventListener("click", async () => {
+  if (!selectedText || !loggedIn) return;
+  await fetch("/api/progress/phrases", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phrases: [selectedText] }),
+  });
+  $("#select-popup").classList.add("hidden");
+  window.getSelection().removeAllRanges();
+  // Brief visual confirmation
+  const btn = $("#select-add-phrase");
+  btn.textContent = "Added!";
+  setTimeout(() => { btn.textContent = "Add to Stolen Phrases"; }, 1500);
+});
 
 // --- Init ---
 checkAuth();

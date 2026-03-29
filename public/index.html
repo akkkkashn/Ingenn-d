@@ -178,9 +178,15 @@
       </div>
       <div class="stats-content">
         <div class="stats-section">
-          <h3>Stolen Phrases <span id="phrase-count" class="badge">0</span></h3>
+          <div class="stats-header-row">
+            <h3>Stolen Phrases <span id="phrase-count" class="badge">0</span></h3>
+            <div class="stats-actions">
+              <button id="select-all-phrases" class="btn-ghost btn-tiny">Select All</button>
+              <button id="delete-selected-phrases" class="btn-ghost btn-tiny btn-danger">Delete Selected</button>
+              <button id="clear-phrases" class="btn-ghost btn-tiny">Clear All</button>
+            </div>
+          </div>
           <div id="stolen-phrases-list" class="stats-list"></div>
-          <button id="clear-phrases" class="btn-ghost btn-small">Clear All</button>
         </div>
         <div class="stats-section">
           <h3>Mistake Log <span id="mistake-count" class="badge">0</span></h3>
@@ -190,6 +196,17 @@
       </div>
     </section>
 
+  </div>
+
+  <!-- Text selection popup -->
+  <div id="select-popup" class="select-popup hidden">
+    <div class="select-popup-content">
+      <div id="select-translation" class="select-translation"></div>
+      <div class="select-popup-actions">
+        <button id="select-add-phrase" class="btn-primary btn-small">Add to Stolen Phrases</button>
+        <button id="select-close" class="btn-ghost btn-tiny">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- Loading -->
