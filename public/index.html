@@ -2,100 +2,175 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Svenska Tränaren</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 <body>
-  <header>
-    <h1>🇸🇪 Svenska Tränaren</h1>
-    <p class="subtitle">Practice Swedish with AI feedback</p>
-  </header>
 
-  <nav id="mode-tabs">
-    <button class="tab active" data-mode="situation-respond">Situation → Respond</button>
-    <button class="tab" data-mode="correct-me">I Write → Correct Me</button>
-    <button class="tab" data-mode="conversation">Conversation</button>
-    <button class="tab" data-mode="rewrite">Rewrite This</button>
-    <button class="tab tab-stats" data-mode="stats">My Progress</button>
-  </nav>
+  <!-- Auth Screen -->
+  <div id="auth-screen" class="screen active">
+    <div class="auth-container">
+      <h1>Svenska Tränaren</h1>
+      <p class="auth-subtitle">Practice Swedish with AI</p>
+      <div id="auth-form">
+        <input type="text" id="auth-username" placeholder="Username" autocomplete="username" autocapitalize="off">
+        <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+        <button id="btn-login" class="btn-primary btn-full">Log In</button>
+        <button id="btn-register" class="btn-ghost btn-full">Create Account</button>
+        <p id="auth-error" class="error-text"></p>
+      </div>
+    </div>
+  </div>
 
-  <main>
-    <!-- Situation → Respond -->
-    <section id="panel-situation-respond" class="panel active">
-      <div class="mode-description">
-        <p>You'll get a situation in English. Respond in Swedish as if you're living it.</p>
-      </div>
-      <div class="situation-box">
-        <button id="new-situation" class="btn-secondary">🎲 New Situation</button>
-        <p id="situation-text" class="situation-prompt">Click "New Situation" to begin!</p>
-      </div>
-      <div class="input-area">
-        <textarea id="input-situation" placeholder="Write your Swedish response here..."></textarea>
-        <button class="btn-primary send-btn" data-mode="situation-respond">Send</button>
-      </div>
-      <div id="feedback-situation-respond" class="feedback-area"></div>
-    </section>
+  <!-- App Screen -->
+  <div id="app-screen" class="screen">
 
-    <!-- I Write → Correct Me -->
-    <section id="panel-correct-me" class="panel">
-      <div class="mode-description">
-        <p>Write anything in Swedish. Claude will correct your mistakes and teach you.</p>
-      </div>
-      <div class="input-area">
-        <textarea id="input-correct" placeholder="Skriv något på svenska..."></textarea>
-        <button class="btn-primary send-btn" data-mode="correct-me">Send</button>
-      </div>
-      <div id="feedback-correct-me" class="feedback-area"></div>
-    </section>
+    <!-- Bottom nav tabs (mobile style) -->
+    <nav id="bottom-nav">
+      <button class="nav-btn active" data-mode="conversation" title="Conversation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Chat</span>
+      </button>
+      <button class="nav-btn" data-mode="correct-me" title="Correct Me">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <span>Correct</span>
+      </button>
+      <button class="nav-btn" data-mode="situation-respond" title="Situations">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5"/></svg>
+        <span>Situation</span>
+      </button>
+      <button class="nav-btn" data-mode="rewrite" title="Rewrite">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        <span>Rewrite</span>
+      </button>
+      <button class="nav-btn" data-mode="translate" title="Translate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>
+        <span>Translate</span>
+      </button>
+      <button class="nav-btn" data-mode="stats" title="Progress">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        <span>Progress</span>
+      </button>
+    </nav>
+
+    <!-- Chat panels — each is a full-screen chat view -->
 
     <!-- Conversation -->
-    <section id="panel-conversation" class="panel">
-      <div class="mode-description">
-        <p>Have a conversation in Swedish. Claude will reply naturally and gently correct mistakes.</p>
+    <section id="panel-conversation" class="chat-panel active">
+      <div class="chat-header">
+        <h2>Conversation</h2>
+        <span class="header-hint">Chat in Swedish</span>
+        <button id="user-menu-btn" class="icon-btn" title="Account">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
       </div>
-      <div id="conversation-log" class="conversation-log"></div>
-      <div class="input-area">
-        <textarea id="input-conversation" placeholder="Skriv på svenska... (start any topic!)"></textarea>
-        <button class="btn-primary send-btn" data-mode="conversation">Send</button>
+      <div id="user-menu-dropdown" class="user-menu hidden">
+        <span id="menu-username" class="menu-user"></span>
+        <button id="btn-logout" class="btn-ghost btn-small">Log Out</button>
       </div>
-      <button id="clear-conversation" class="btn-secondary btn-small">Clear Conversation</button>
+      <div class="chat-messages" id="msgs-conversation"></div>
+      <div class="chat-input-bar">
+        <textarea id="input-conversation" placeholder="Skriv på svenska..." rows="1"></textarea>
+        <button class="send-btn" data-mode="conversation">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
     </section>
 
-    <!-- Rewrite This -->
-    <section id="panel-rewrite" class="panel">
-      <div class="mode-description">
-        <p>Write something in English, and learn how to say it in Swedish with a full breakdown.</p>
+    <!-- Correct Me -->
+    <section id="panel-correct-me" class="chat-panel">
+      <div class="chat-header">
+        <h2>Correct Me</h2>
+        <span class="header-hint">Write Swedish, get corrections</span>
       </div>
-      <div class="input-area">
-        <textarea id="input-rewrite" placeholder="Write in English what you want to say in Swedish..."></textarea>
-        <button class="btn-primary send-btn" data-mode="rewrite">Send</button>
+      <div class="chat-messages" id="msgs-correct-me"></div>
+      <div class="chat-input-bar">
+        <textarea id="input-correct" placeholder="Skriv något på svenska..." rows="1"></textarea>
+        <button class="send-btn" data-mode="correct-me">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
       </div>
-      <div id="feedback-rewrite" class="feedback-area"></div>
     </section>
 
-    <!-- Stats -->
-    <section id="panel-stats" class="panel">
-      <div class="stats-container">
+    <!-- Situation Respond -->
+    <section id="panel-situation-respond" class="chat-panel">
+      <div class="chat-header">
+        <h2>Situations</h2>
+        <span class="header-hint">Respond to real-life scenarios</span>
+      </div>
+      <div class="chat-messages" id="msgs-situation-respond"></div>
+      <div class="situation-bar">
+        <button id="new-situation" class="btn-situation">New Situation</button>
+      </div>
+      <div class="chat-input-bar">
+        <textarea id="input-situation" placeholder="Write your Swedish response..." rows="1"></textarea>
+        <button class="send-btn" data-mode="situation-respond">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- Rewrite -->
+    <section id="panel-rewrite" class="chat-panel">
+      <div class="chat-header">
+        <h2>Rewrite</h2>
+        <span class="header-hint">English in, Swedish out with breakdown</span>
+      </div>
+      <div class="chat-messages" id="msgs-rewrite"></div>
+      <div class="chat-input-bar">
+        <textarea id="input-rewrite" placeholder="Write in English..." rows="1"></textarea>
+        <button class="send-btn" data-mode="rewrite">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- Translate -->
+    <section id="panel-translate" class="chat-panel">
+      <div class="chat-header">
+        <h2>Translate</h2>
+        <span class="header-hint">Swedish or English, auto-detected</span>
+      </div>
+      <div class="chat-messages" id="msgs-translate"></div>
+      <div class="chat-input-bar">
+        <textarea id="input-translate" placeholder="Type in Swedish or English..." rows="1"></textarea>
+        <button class="send-btn" data-mode="translate">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- Stats / Progress -->
+    <section id="panel-stats" class="chat-panel">
+      <div class="chat-header">
+        <h2>My Progress</h2>
+        <span class="header-hint">Track your learning</span>
+      </div>
+      <div class="stats-content">
         <div class="stats-section">
-          <h2>Stolen Phrases</h2>
-          <p class="stats-hint">Useful Swedish phrases collected from your sessions</p>
+          <h3>Stolen Phrases <span id="phrase-count" class="badge">0</span></h3>
           <div id="stolen-phrases-list" class="stats-list"></div>
-          <button id="clear-phrases" class="btn-secondary btn-small">Clear All Phrases</button>
+          <button id="clear-phrases" class="btn-ghost btn-small">Clear All</button>
         </div>
         <div class="stats-section">
-          <h2>Mistake Log</h2>
-          <p class="stats-hint">Track your recurring mistakes to improve faster</p>
+          <h3>Mistake Log <span id="mistake-count" class="badge">0</span></h3>
           <div id="mistakes-list" class="stats-list"></div>
-          <button id="clear-mistakes" class="btn-secondary btn-small">Clear All Mistakes</button>
+          <button id="clear-mistakes" class="btn-ghost btn-small">Clear All</button>
         </div>
       </div>
     </section>
-  </main>
 
+  </div>
+
+  <!-- Loading -->
   <div id="loading-overlay" class="loading-overlay hidden">
-    <div class="spinner"></div>
-    <p>Claude is thinking...</p>
+    <div class="typing-indicator">
+      <span></span><span></span><span></span>
+    </div>
   </div>
 
   <script src="app.js"></script>

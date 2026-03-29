@@ -1,0 +1,5 @@
+node_modules
+.env
+data.db
+sessions.db
+*.db-journal

@@ -1,8 +1,10 @@
 // --- State ---
+let loggedIn = false;
 const conversationHistory = [];
+let currentSituation = "";
 
 const SITUATIONS = [
-  "You're at a café in Stockholm and want to order a coffee and a cinnamon bun.",
+  "You're at a cafe in Stockholm and want to order a coffee and a cinnamon bun.",
   "You're lost in Gothenburg and need to ask someone for directions to the train station.",
   "You're at a job interview and the interviewer asks you to describe your strengths.",
   "You're calling to book a table for four at a restaurant for Friday evening.",
@@ -27,15 +29,106 @@ const SITUATIONS = [
 // --- DOM ---
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
-const loading = $("#loading-overlay");
 
-// --- Tabs ---
-$$(".tab").forEach((tab) => {
-  tab.addEventListener("click", () => {
-    $$(".tab").forEach((t) => t.classList.remove("active"));
-    $$(".panel").forEach((p) => p.classList.remove("active"));
-    tab.classList.add("active");
-    const mode = tab.dataset.mode;
+// --- Auto-resize textareas ---
+$$(".chat-input-bar textarea").forEach((ta) => {
+  ta.addEventListener("input", () => {
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+  });
+});
+
+// --- Auth ---
+async function checkAuth() {
+  try {
+    const res = await fetch("/api/me");
+    const data = await res.json();
+    if (data.loggedIn) {
+      loggedIn = true;
+      showApp(data.username);
+    }
+  } catch {}
+}
+
+$("#btn-login").addEventListener("click", async () => {
+  const username = $("#auth-username").value.trim();
+  const password = $("#auth-password").value;
+  if (!username || !password) return showAuthError("Fill in both fields");
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) return showAuthError(data.error);
+    loggedIn = true;
+    showApp(data.username);
+  } catch { showAuthError("Connection error"); }
+});
+
+$("#btn-register").addEventListener("click", async () => {
+  const username = $("#auth-username").value.trim();
+  const password = $("#auth-password").value;
+  if (!username || !password) return showAuthError("Fill in both fields");
+  try {
+    const res = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) return showAuthError(data.error);
+    loggedIn = true;
+    showApp(data.username);
+  } catch { showAuthError("Connection error"); }
+});
+
+// Enter key on password field
+$("#auth-password").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("#btn-login").click();
+});
+
+function showAuthError(msg) {
+  $("#auth-error").textContent = msg;
+}
+
+function showApp(username) {
+  $("#auth-screen").classList.remove("active");
+  $("#app-screen").classList.add("active");
+  $("#menu-username").textContent = username;
+  loadProgress();
+}
+
+// Logout
+$("#btn-logout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  loggedIn = false;
+  $("#app-screen").classList.remove("active");
+  $("#auth-screen").classList.add("active");
+  $("#auth-username").value = "";
+  $("#auth-password").value = "";
+  $("#auth-error").textContent = "";
+  $("#user-menu-dropdown").classList.add("hidden");
+});
+
+// User menu toggle
+$("#user-menu-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  $("#user-menu-dropdown").classList.toggle("hidden");
+});
+
+document.addEventListener("click", () => {
+  $("#user-menu-dropdown").classList.add("hidden");
+});
+
+// --- Navigation ---
+$$(".nav-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    $$(".nav-btn").forEach((b) => b.classList.remove("active"));
+    $$(".chat-panel").forEach((p) => p.classList.remove("active"));
+    btn.classList.add("active");
+    const mode = btn.dataset.mode;
     $(`#panel-${mode}`).classList.add("active");
     if (mode === "stats") renderStats();
   });
@@ -43,8 +136,8 @@ $$(".tab").forEach((tab) => {
 
 // --- Situations ---
 $("#new-situation").addEventListener("click", () => {
-  const idx = Math.floor(Math.random() * SITUATIONS.length);
-  $("#situation-text").textContent = SITUATIONS[idx];
+  currentSituation = SITUATIONS[Math.floor(Math.random() * SITUATIONS.length)];
+  addBubble("msgs-situation-respond", "system", currentSituation);
 });
 
 // --- Send buttons ---
@@ -52,26 +145,20 @@ $$(".send-btn").forEach((btn) => {
   btn.addEventListener("click", () => handleSend(btn.dataset.mode));
 });
 
-// Ctrl+Enter to send
-$$("textarea").forEach((ta) => {
+// Enter to send (no shift)
+$$(".chat-input-bar textarea").forEach((ta) => {
   ta.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-      const panel = ta.closest(".panel");
-      const btn = panel.querySelector(".send-btn");
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const btn = ta.parentElement.querySelector(".send-btn");
       if (btn) btn.click();
     }
   });
 });
 
-// --- Clear conversation ---
-$("#clear-conversation").addEventListener("click", () => {
-  conversationHistory.length = 0;
-  $("#conversation-log").innerHTML = "";
-});
-
-// --- API call ---
+// --- API ---
 async function apiChat(mode, messages) {
-  loading.classList.remove("hidden");
+  $("#loading-overlay").classList.remove("hidden");
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
@@ -84,295 +171,265 @@ async function apiChat(mode, messages) {
     }
     return await res.json();
   } finally {
-    loading.classList.add("hidden");
+    $("#loading-overlay").classList.add("hidden");
   }
 }
 
 // --- Handle Send ---
 async function handleSend(mode) {
   let userText, messages;
+  const inputMap = {
+    "conversation": "#input-conversation",
+    "correct-me": "#input-correct",
+    "situation-respond": "#input-situation",
+    "rewrite": "#input-rewrite",
+    "translate": "#input-translate",
+  };
 
+  const input = $(inputMap[mode]);
+  userText = input.value.trim();
+  if (!userText) return;
+  if (mode === "situation-respond" && !currentSituation) return;
+
+  // Show user bubble
+  const msgsId = `msgs-${mode}`;
+  addBubble(msgsId, "user", userText);
+  input.value = "";
+  input.style.height = "auto";
+
+  // Build messages
   switch (mode) {
-    case "situation-respond": {
-      const situation = $("#situation-text").textContent;
-      userText = $("#input-situation").value.trim();
-      if (!userText || situation.startsWith("Click")) return;
-      messages = [
-        { role: "user", content: `Situation: ${situation}\n\nMy response: ${userText}` },
-      ];
-      $("#input-situation").value = "";
+    case "situation-respond":
+      messages = [{ role: "user", content: `Situation: ${currentSituation}\n\nMy response: ${userText}` }];
       break;
-    }
-    case "correct-me": {
-      userText = $("#input-correct").value.trim();
-      if (!userText) return;
-      messages = [{ role: "user", content: userText }];
-      $("#input-correct").value = "";
-      break;
-    }
-    case "conversation": {
-      userText = $("#input-conversation").value.trim();
-      if (!userText) return;
+    case "conversation":
       conversationHistory.push({ role: "user", content: userText });
-      appendConvMessage("user", userText);
       messages = [...conversationHistory];
-      $("#input-conversation").value = "";
       break;
-    }
-    case "rewrite": {
-      userText = $("#input-rewrite").value.trim();
-      if (!userText) return;
-      messages = [{ role: "user", content: userText }];
-      $("#input-rewrite").value = "";
-      break;
-    }
     default:
-      return;
+      messages = [{ role: "user", content: userText }];
   }
 
   try {
     const data = await apiChat(mode, messages);
 
     if (data.raw) {
-      renderRawFeedback(mode, data.raw);
+      addBubble(msgsId, "assistant", data.raw);
       return;
     }
 
     switch (mode) {
-      case "situation-respond":
-        renderSituationFeedback(data);
+      case "conversation":
+        renderConvResponse(msgsId, data);
         break;
       case "correct-me":
-        renderCorrectFeedback(data);
+        renderCorrectionResponse(msgsId, data);
         break;
-      case "conversation":
-        renderConversationResponse(data);
+      case "situation-respond":
+        renderSituationResponse(msgsId, data);
         break;
       case "rewrite":
-        renderRewriteFeedback(data);
+        renderRewriteResponse(msgsId, data);
+        break;
+      case "translate":
+        renderTranslateResponse(msgsId, data);
         break;
     }
 
-    // Save to localStorage
-    saveStolenPhrases(data.stolen_phrases);
-    saveMistakes(data.mistakes || data.corrections);
+    // Save progress server-side
+    saveProgress(data.stolen_phrases, data.mistakes || data.corrections);
   } catch (err) {
-    alert("Error: " + err.message);
+    addBubble(msgsId, "system", "Error: " + err.message);
   }
+}
+
+// --- Bubble helper ---
+function addBubble(containerId, type, text) {
+  const container = $(`#${containerId}`);
+  const div = document.createElement("div");
+  div.className = `bubble ${type}`;
+  div.textContent = text;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function addRichBubble(containerId, html) {
+  const container = $(`#${containerId}`);
+  const div = document.createElement("div");
+  div.className = "bubble assistant";
+  div.innerHTML = html;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function esc(str) {
+  if (!str) return "";
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
 }
 
 // --- Renderers ---
 
-function renderRawFeedback(mode, text) {
-  const container =
-    mode === "conversation"
-      ? $("#conversation-log")
-      : $(`#feedback-${mode}`);
-  container.innerHTML = `<div class="feedback-card"><p>${escHtml(text)}</p></div>`;
-}
+function renderConvResponse(msgsId, data) {
+  let html = "";
 
-function ratingBadge(rating) {
-  if (!rating) return "";
-  return `<span class="rating-badge rating-${rating}">${rating.replace("_", " ")}</span>`;
-}
-
-function mistakesHtml(mistakes) {
-  if (!mistakes || mistakes.length === 0) return "";
-  return `
-    <div class="feedback-card">
-      <h3>Corrections</h3>
-      ${mistakes
-        .map(
-          (m) => `
-        <div class="mistake-item">
-          <span class="original">${escHtml(m.original)}</span> → <span class="corrected">${escHtml(m.corrected)}</span>
-          <div class="explanation">${escHtml(m.explanation)}</div>
-        </div>`
-        )
-        .join("")}
-    </div>`;
-}
-
-function phrasesHtml(phrases) {
-  if (!phrases || phrases.length === 0) return "";
-  return `
-    <div class="feedback-card">
-      <h3>Stolen Phrases</h3>
-      <div>${phrases.map((p) => `<span class="phrase-chip">${escHtml(p)}</span>`).join(" ")}</div>
-    </div>`;
-}
-
-function renderSituationFeedback(data) {
-  const el = $("#feedback-situation-respond");
-  el.innerHTML = `
-    ${ratingBadge(data.rating)}
-    <div class="feedback-card">
-      <h3>Corrected</h3>
-      <p class="swedish-text">${escHtml(data.corrected)}</p>
-    </div>
-    ${mistakesHtml(data.mistakes)}
-    <div class="feedback-card">
-      <h3>Natural Swedish</h3>
-      <p class="swedish-text">${escHtml(data.natural_version)}</p>
-    </div>
-    <div class="feedback-card">
-      <h3>Feedback</h3>
-      <p>${escHtml(data.feedback)}</p>
-    </div>
-    ${phrasesHtml(data.stolen_phrases)}
-  `;
-}
-
-function renderCorrectFeedback(data) {
-  const el = $("#feedback-correct-me");
-  el.innerHTML = `
-    ${ratingBadge(data.rating)}
-    <div class="feedback-card">
-      <h3>Corrected</h3>
-      <p class="swedish-text">${escHtml(data.corrected)}</p>
-    </div>
-    ${mistakesHtml(data.mistakes)}
-    <div class="feedback-card">
-      <h3>Natural Version</h3>
-      <p class="swedish-text">${escHtml(data.natural_version)}</p>
-    </div>
-    <div class="feedback-card">
-      <h3>Feedback</h3>
-      <p>${escHtml(data.feedback)}</p>
-    </div>
-    ${phrasesHtml(data.stolen_phrases)}
-  `;
-}
-
-function renderConversationResponse(data) {
   if (data.corrections && data.corrections.length > 0) {
-    const corrDiv = document.createElement("div");
-    corrDiv.className = "conv-corrections";
-    corrDiv.innerHTML = data.corrections
-      .map((c) => `<span class="original">${escHtml(c.original)}</span> → <span class="corrected">${escHtml(c.corrected)}</span> <em>(${escHtml(c.explanation)})</em>`)
-      .join("<br>");
-    $("#conversation-log").appendChild(corrDiv);
+    html += data.corrections.map((c) =>
+      `<div class="correction"><span class="orig">${esc(c.original)}</span> &rarr; <span class="fix">${esc(c.corrected)}</span><span class="expl">${esc(c.explanation)}</span></div>`
+    ).join("");
   }
 
-  appendConvMessage("assistant", data.reply_swedish, data.reply_english);
-
-  conversationHistory.push({
-    role: "assistant",
-    content: data.reply_swedish,
-  });
+  html += `<div class="swedish">${esc(data.reply_swedish)}</div>`;
+  html += `<div class="translation-text">${esc(data.reply_english)}</div>`;
 
   if (data.feedback) {
-    const fb = document.createElement("div");
-    fb.className = "conv-corrections";
-    fb.textContent = data.feedback;
-    $("#conversation-log").appendChild(fb);
+    html += `<div class="note">${esc(data.feedback)}</div>`;
   }
 
-  scrollConversation();
-}
-
-function appendConvMessage(role, text, translation) {
-  const div = document.createElement("div");
-  div.className = `conv-msg ${role}`;
-  div.innerHTML = `<p>${escHtml(text)}</p>`;
-  if (translation) {
-    div.innerHTML += `<p class="translation">${escHtml(translation)}</p>`;
+  if (data.stolen_phrases && data.stolen_phrases.length > 0) {
+    html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
   }
-  $("#conversation-log").appendChild(div);
-  scrollConversation();
+
+  addRichBubble(msgsId, html);
+
+  conversationHistory.push({ role: "assistant", content: data.reply_swedish });
 }
 
-function scrollConversation() {
-  const log = $("#conversation-log");
-  log.scrollTop = log.scrollHeight;
-}
+function renderCorrectionResponse(msgsId, data) {
+  let html = "";
 
-function renderRewriteFeedback(data) {
-  const el = $("#feedback-rewrite");
-  el.innerHTML = `
-    <div class="feedback-card">
-      <h3>Swedish Translation</h3>
-      <p class="swedish-text">${escHtml(data.swedish)}</p>
-    </div>
-    <div class="feedback-card">
-      <h3>Word-by-Word Breakdown</h3>
-      <p>${escHtml(data.literal_breakdown)}</p>
-    </div>
-    ${
-      data.grammar_notes
-        ? `<div class="feedback-card">
-            <h3>Grammar Notes</h3>
-            ${data.grammar_notes.map((n) => `<div class="grammar-note">${escHtml(n)}</div>`).join("")}
-          </div>`
-        : ""
-    }
-    ${
-      data.alternatives
-        ? `<div class="feedback-card">
-            <h3>Alternatives</h3>
-            ${data.alternatives.map((a) => `<p class="swedish-text">${escHtml(a)}</p>`).join("")}
-          </div>`
-        : ""
-    }
-    ${phrasesHtml(data.stolen_phrases)}
-  `;
-}
-
-// --- localStorage ---
-
-function saveStolenPhrases(phrases) {
-  if (!phrases || phrases.length === 0) return;
-  const saved = JSON.parse(localStorage.getItem("sv_phrases") || "[]");
-  for (const p of phrases) {
-    if (!saved.includes(p)) saved.push(p);
+  if (data.rating) {
+    html += `<span class="rating rating-${data.rating}">${data.rating.replace("_", " ")}</span>`;
   }
-  localStorage.setItem("sv_phrases", JSON.stringify(saved));
+
+  html += `<div class="label">Corrected</div><div class="swedish">${esc(data.corrected)}</div>`;
+
+  if (data.mistakes && data.mistakes.length > 0) {
+    html += data.mistakes.map((m) =>
+      `<div class="correction"><span class="orig">${esc(m.original)}</span> &rarr; <span class="fix">${esc(m.corrected)}</span><span class="expl">${esc(m.explanation)}</span></div>`
+    ).join("");
+  }
+
+  if (data.natural_version) {
+    html += `<div class="label">Native version</div><div class="swedish">${esc(data.natural_version)}</div>`;
+  }
+
+  if (data.feedback) {
+    html += `<div class="note">${esc(data.feedback)}</div>`;
+  }
+
+  if (data.stolen_phrases && data.stolen_phrases.length > 0) {
+    html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
+  }
+
+  addRichBubble(msgsId, html);
 }
 
-function saveMistakes(mistakes) {
-  if (!mistakes || mistakes.length === 0) return;
-  const saved = JSON.parse(localStorage.getItem("sv_mistakes") || "{}");
-  for (const m of mistakes) {
-    const key = `${m.original} → ${m.corrected}`;
-    saved[key] = (saved[key] || 0) + 1;
+function renderSituationResponse(msgsId, data) {
+  renderCorrectionResponse(msgsId, data);
+}
+
+function renderRewriteResponse(msgsId, data) {
+  let html = "";
+
+  html += `<div class="label">Swedish</div><div class="swedish">${esc(data.swedish)}</div>`;
+  html += `<div class="label">Breakdown</div><div>${esc(data.literal_breakdown)}</div>`;
+
+  if (data.grammar_notes && data.grammar_notes.length > 0) {
+    html += `<div class="label">Grammar</div>`;
+    html += data.grammar_notes.map((n) => `<div class="grammar-note">${esc(n)}</div>`).join("");
   }
-  localStorage.setItem("sv_mistakes", JSON.stringify(saved));
+
+  if (data.alternatives && data.alternatives.length > 0) {
+    html += `<div class="label">Alternatives</div>`;
+    html += data.alternatives.map((a) => `<div class="alt">${esc(a)}</div>`).join("");
+  }
+
+  if (data.stolen_phrases && data.stolen_phrases.length > 0) {
+    html += `<div class="phrases">${data.stolen_phrases.map((p) => `<span class="phrase-tag">${esc(p)}</span>`).join("")}</div>`;
+  }
+
+  addRichBubble(msgsId, html);
+}
+
+function renderTranslateResponse(msgsId, data) {
+  let html = "";
+
+  const dir = data.detected_language === "swedish" ? "SV &rarr; EN" : "EN &rarr; SV";
+  html += `<div class="label">${dir}</div>`;
+  html += `<div class="swedish">${esc(data.translation)}</div>`;
+
+  if (data.literal) {
+    html += `<div class="label">Literal</div><div class="translation-text">${esc(data.literal)}</div>`;
+  }
+
+  if (data.notes) {
+    html += `<div class="note">${esc(data.notes)}</div>`;
+  }
+
+  addRichBubble(msgsId, html);
+}
+
+// --- Server-side progress ---
+async function saveProgress(phrases, mistakes) {
+  if (!loggedIn) return;
+  if (phrases && phrases.length > 0) {
+    fetch("/api/progress/phrases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phrases }),
+    });
+  }
+  if (mistakes && mistakes.length > 0) {
+    fetch("/api/progress/mistakes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mistakes }),
+    });
+  }
+}
+
+async function loadProgress() {
+  if (!loggedIn) return;
+  try {
+    const res = await fetch("/api/progress");
+    if (!res.ok) return;
+    const data = await res.json();
+    renderStatsData(data);
+  } catch {}
 }
 
 function renderStats() {
-  // Phrases
-  const phrases = JSON.parse(localStorage.getItem("sv_phrases") || "[]");
+  loadProgress();
+}
+
+function renderStatsData(data) {
   const phrasesList = $("#stolen-phrases-list");
-  phrasesList.innerHTML = phrases
-    .map((p) => `<div class="stats-phrase">${escHtml(p)}</div>`)
-    .join("");
-
-  // Mistakes
-  const mistakes = JSON.parse(localStorage.getItem("sv_mistakes") || "{}");
   const mistakesList = $("#mistakes-list");
-  const sorted = Object.entries(mistakes).sort((a, b) => b[1] - a[1]);
-  mistakesList.innerHTML = sorted
-    .map(
-      ([k, v]) =>
-        `<div class="stats-mistake">${escHtml(k)} <span class="count">(×${v})</span></div>`
-    )
+
+  $("#phrase-count").textContent = data.phrases.length;
+  $("#mistake-count").textContent = data.mistakes.length;
+
+  phrasesList.innerHTML = data.phrases
+    .map((p) => `<div class="stats-item">${esc(p.phrase)}</div>`)
+    .join("");
+
+  mistakesList.innerHTML = data.mistakes
+    .map((m) => `<div class="stats-item"><span class="orig">${esc(m.original)}</span> &rarr; <span class="fix">${esc(m.corrected)}</span> <span class="count">(&times;${m.count})</span></div>`)
     .join("");
 }
 
-$("#clear-phrases").addEventListener("click", () => {
-  localStorage.removeItem("sv_phrases");
-  renderStats();
+$("#clear-phrases").addEventListener("click", async () => {
+  await fetch("/api/progress/phrases", { method: "DELETE" });
+  renderStatsData({ phrases: [], mistakes: (await (await fetch("/api/progress")).json()).mistakes });
 });
 
-$("#clear-mistakes").addEventListener("click", () => {
-  localStorage.removeItem("sv_mistakes");
-  renderStats();
+$("#clear-mistakes").addEventListener("click", async () => {
+  await fetch("/api/progress/mistakes", { method: "DELETE" });
+  renderStatsData({ phrases: (await (await fetch("/api/progress")).json()).phrases, mistakes: [] });
 });
 
-// --- Utility ---
-function escHtml(str) {
-  if (!str) return "";
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
+// --- Init ---
+checkAuth();
