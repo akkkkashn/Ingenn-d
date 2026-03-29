@@ -300,10 +300,14 @@ function renderLabResponse(msgsId, data) {
     </div>`;
   }
 
-  // Casual card
+  // Casual card with "not natural" button
   if (data.casual) {
-    html += `<div class="lab-card">
-      <div class="lab-card-header"><span class="lab-badge lab-badge-casual">Casual / Slang</span></div>
+    const casualId = "casual-" + Date.now();
+    html += `<div class="lab-card" id="${casualId}">
+      <div class="lab-card-header">
+        <span class="lab-badge lab-badge-casual">Casual / Slang</span>
+        <button class="btn-not-natural" data-casual="${esc(data.casual.text)}" data-card="${casualId}">Not natural?</button>
+      </div>
       <div class="lab-text">${esc(data.casual.text)}</div>
       <div class="lab-translation">${esc(data.casual.translation)}</div>
       <div class="lab-context">${esc(data.casual.context)}</div>
@@ -703,6 +707,56 @@ $("#select-add-phrase").addEventListener("click", async () => {
   const btn = $("#select-add-phrase");
   btn.textContent = "Added!";
   setTimeout(() => { btn.textContent = "Add to Stolen Phrases"; }, 1500);
+});
+
+// --- "Not natural" casual correction ---
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".btn-not-natural");
+  if (!btn) return;
+
+  const card = document.getElementById(btn.dataset.card);
+  if (!card || card.querySelector(".casual-correction-form")) return;
+
+  const aiSaid = btn.dataset.casual;
+  btn.style.display = "none";
+
+  const form = document.createElement("div");
+  form.className = "casual-correction-form";
+  form.innerHTML = `
+    <div class="correction-label">How would a real Swede say it?</div>
+    <input type="text" class="correction-input" placeholder="e.g. Kom över ikväll!">
+    <div class="correction-actions">
+      <button class="btn-primary btn-small correction-submit">Save</button>
+      <button class="btn-ghost btn-tiny correction-cancel">Cancel</button>
+    </div>
+  `;
+  card.appendChild(form);
+
+  const input = form.querySelector(".correction-input");
+  input.focus();
+
+  form.querySelector(".correction-submit").addEventListener("click", async () => {
+    const userSaid = input.value.trim();
+    if (!userSaid) return;
+
+    await fetch("/api/casual-correction", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ai_said: aiSaid, user_said: userSaid }),
+    });
+
+    form.innerHTML = `<div class="correction-saved">Saved! The app will learn from this.</div>`;
+    setTimeout(() => form.remove(), 2000);
+  });
+
+  form.querySelector(".correction-cancel").addEventListener("click", () => {
+    form.remove();
+    btn.style.display = "";
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") form.querySelector(".correction-submit").click();
+  });
 });
 
 // --- Init ---

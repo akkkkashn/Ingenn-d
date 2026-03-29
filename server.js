@@ -41,6 +41,13 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id),
     UNIQUE(user_id, original, corrected)
   );
+  CREATE TABLE IF NOT EXISTS casual_corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ai_said TEXT NOT NULL,
+    user_said TEXT NOT NULL,
+    context TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // --- Session ---
@@ -197,11 +204,41 @@ Reply in this exact JSON format:
 
 Be encouraging but honest.`,
 
-  "lab": `You are a Swedish language lab assistant. The user will send you text in Swedish or English. Your job:
+  "lab": null // built dynamically with casual corrections
+};
+
+function buildLabPrompt() {
+  const corrections = db.prepare("SELECT ai_said, user_said FROM casual_corrections ORDER BY created_at DESC LIMIT 20").all();
+
+  let correctionsBlock = "";
+  if (corrections.length > 0) {
+    correctionsBlock = `\n\nIMPORTANT — A native speaker has corrected your casual Swedish before. LEARN from these corrections and apply the same patterns:\n${corrections.map((c) => `AI said: "${c.ai_said}" → Native says: "${c.user_said}"`).join("\n")}\n\nUse these as your guide for what REAL casual Swedish sounds like. Match this style.`;
+  }
+
+  return `You are a Swedish language lab assistant. The user will send you text in Swedish or English. Your job:
 
 1. If it's Swedish: check grammar/spelling, correct mistakes, then provide the translation
 2. If it's English: translate it to Swedish
 3. Either way: provide BOTH a formal version and a casual/slang version
+
+FOR THE CASUAL VERSION — this is critical. Write like a real 20-something Swede texting a friend. Rules:
+- Use SHORT imperative forms: "Kom över ikväll!" not "Du borde komma över ikväll"
+- Use "Sväng förbi" not "Du kan komma och besöka"
+- Use contractions: de instead of det, nåt instead of något, nån instead of någon, va instead of var
+- Use filler words naturally: typ, liksom, asså, ba (for bara)
+- Drop unnecessary pronouns: "Hänger du med?" not "Vill du följa med mig?"
+- Use slang: fett, grymt, sjukt, najs, kull (for kul), bre/bror
+- Prefer direct/punchy over polite/wordy
+- Think: how would you text this to your best friend in Stockholm?
+
+Examples of formal → real casual:
+- "Du borde verkligen komma över ikväll" → "Kom över ikväll!" or "Sväng förbi ikväll"
+- "Vill du hänga med och äta middag?" → "Käka med oss?"
+- "Det var väldigt roligt" → "Haha de va sjukt kul"
+- "Jag förstår inte vad du menar" → "Fattar inte va du menar"
+- "Skulle du kunna hjälpa mig?" → "Kan du hjälpa mig?" or just "Hjälp mig me det"
+- "Vi ses imorgon" → "Ses imorn!"
+- "Hur mår du idag?" → "Läget?" or "Allt bra?"${correctionsBlock}
 
 Reply in this exact JSON format:
 {
@@ -213,7 +250,7 @@ Reply in this exact JSON format:
     "context": "<when you'd use the formal version — 1 sentence>"
   },
   "casual": {
-    "text": "<casual/slang Swedish version — how young Swedes actually talk>",
+    "text": "<real casual Swedish — short, punchy, how a native actually texts/talks>",
     "translation": "<English translation of the casual version>",
     "context": "<when you'd use the casual version — 1 sentence>"
   },
@@ -221,8 +258,8 @@ Reply in this exact JSON format:
   "stolen_phrases": ["<useful phrases worth memorizing>"]
 }
 
-Be thorough with grammar checking. The casual version should feel genuinely casual — contractions, slang, spoken Swedish.`
-};
+Be thorough with grammar checking. The casual version MUST feel genuinely native — not textbook casual.`
+}
 
 // --- Phrase of the Day endpoint ---
 app.get("/api/phrase-of-day", async (req, res) => {
@@ -327,6 +364,14 @@ Max 4-5 top_mistakes entries. Every pattern MUST include real examples from the 
   }
 });
 
+// --- Casual corrections ---
+app.post("/api/casual-correction", (req, res) => {
+  const { ai_said, user_said, context } = req.body;
+  if (!ai_said || !user_said) return res.status(400).json({ error: "Missing fields" });
+  db.prepare("INSERT INTO casual_corrections (ai_said, user_said, context) VALUES (?, ?, ?)").run(ai_said, user_said, context || "");
+  res.json({ ok: true });
+});
+
 // --- Quick translate for text selection ---
 app.post("/api/quick-translate", async (req, res) => {
   const { text } = req.body;
@@ -357,7 +402,7 @@ app.delete("/api/progress/phrases/:phrase", requireAuth, (req, res) => {
 app.post("/api/chat", async (req, res) => {
   const { mode, messages } = req.body;
 
-  const systemPrompt = SYSTEM_PROMPTS[mode];
+  const systemPrompt = mode === "lab" ? buildLabPrompt() : SYSTEM_PROMPTS[mode];
   if (!systemPrompt) {
     return res.status(400).json({ error: "Invalid mode" });
   }

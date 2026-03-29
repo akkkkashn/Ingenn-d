@@ -412,6 +412,57 @@ body {
 .lab-badge-formal { background: rgba(0,106,167,0.2); color: var(--accent-hover); }
 .lab-badge-casual { background: rgba(254,204,2,0.15); color: var(--yellow); }
 
+/* Not natural button */
+.btn-not-natural {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.65rem;
+  transition: all 0.2s;
+}
+
+.btn-not-natural:hover { color: var(--orange); border-color: var(--orange); }
+
+/* Correction form inside casual card */
+.casual-correction-form {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+.correction-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 0.3rem;
+}
+
+.correction-input {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  margin-bottom: 0.4rem;
+}
+
+.correction-input:focus { outline: none; border-color: var(--accent); }
+
+.correction-actions { display: flex; gap: 0.4rem; align-items: center; }
+
+.correction-saved {
+  font-size: 0.85rem;
+  color: var(--green);
+  font-style: italic;
+  padding: 0.3rem 0;
+}
+
 .lab-card .lab-text { font-size: 1.05rem; color: var(--yellow); font-weight: 500; }
 .lab-card .lab-translation { font-size: 0.85rem; color: var(--text-dim); font-style: italic; margin-top: 0.15rem; }
 .lab-card .lab-context { font-size: 0.78rem; color: var(--text-dim); margin-top: 0.2rem; }
