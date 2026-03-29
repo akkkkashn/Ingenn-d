@@ -507,6 +507,135 @@ body {
   40% { transform: scale(1); opacity: 1; }
 }
 
+/* ===== PHRASE OF THE DAY ===== */
+.potd-section { margin-bottom: 2rem; }
+.potd-section h3 { font-size: 1rem; margin-bottom: 0.6rem; }
+
+.potd-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  border-left: 4px solid var(--yellow);
+}
+
+.potd-loading { color: var(--text-dim); font-style: italic; }
+
+.potd-phrase {
+  font-size: 1.4rem;
+  color: var(--yellow);
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.potd-pronunciation {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-style: italic;
+  margin-bottom: 0.8rem;
+}
+
+.potd-row {
+  margin-bottom: 0.6rem;
+}
+
+.potd-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+
+.potd-value { font-size: 0.95rem; }
+.potd-swedish { color: var(--yellow); }
+
+.potd-difficulty {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+}
+
+.potd-difficulty.intermediate { background: rgba(254,204,2,0.15); color: var(--yellow); }
+.potd-difficulty.advanced { background: rgba(248,113,113,0.15); color: var(--red); }
+
+/* ===== REPORT ===== */
+.report-section h3 { font-size: 1rem; margin-bottom: 0.3rem; }
+.stats-hint { color: var(--text-dim); font-size: 0.8rem; margin-bottom: 0.8rem; }
+
+.report-preview {
+  margin-top: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+}
+
+.report-preview .report-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.btn-print {
+  padding: 0.6rem 1.2rem;
+  background: var(--yellow);
+  color: #000;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.btn-print:hover { opacity: 0.9; }
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  body { background: white; color: black; }
+  #bottom-nav, .chat-header, .report-actions,
+  .potd-section, .report-section > p,
+  .report-section > button, .btn-print,
+  #loading-overlay { display: none !important; }
+
+  .screen, .chat-panel, .report-preview {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: white !important;
+  }
+
+  .stats-content { padding: 0 !important; overflow: visible !important; }
+
+  #print-report {
+    display: block !important;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: black;
+    max-width: 100%;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  #print-report h1 { font-size: 18pt; margin-bottom: 4pt; border-bottom: 2pt solid #006aa7; padding-bottom: 4pt; }
+  #print-report h2 { font-size: 13pt; margin: 12pt 0 4pt; color: #006aa7; }
+  #print-report h3 { font-size: 11pt; margin: 8pt 0 2pt; }
+  #print-report .print-potd { background: #f5f5f5; padding: 8pt; border-left: 3pt solid #fecc02; margin-bottom: 10pt; }
+  #print-report .print-potd .phrase { font-size: 14pt; font-weight: bold; }
+  #print-report .print-mistake { margin-bottom: 6pt; padding-left: 8pt; border-left: 2pt solid #ddd; }
+  #print-report .print-swedish { color: #555; font-style: italic; margin-top: 2pt; }
+  #print-report .print-focus { margin: 2pt 0; padding-left: 12pt; }
+  #print-report .print-meta { font-size: 9pt; color: #999; text-align: right; }
+}
+
 .hidden { display: none !important; }
 
 /* ===== DESKTOP ===== */

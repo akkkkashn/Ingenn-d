@@ -140,6 +140,22 @@ app.delete("/api/progress/mistakes", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Phrase of the Day ---
+db.exec(`
+  CREATE TABLE IF NOT EXISTS phrase_of_day (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT UNIQUE NOT NULL,
+    phrase TEXT NOT NULL,
+    pronunciation TEXT,
+    literal TEXT,
+    meaning TEXT,
+    context TEXT,
+    example_swedish TEXT,
+    example_english TEXT,
+    difficulty TEXT
+  );
+`);
+
 // --- Anthropic ---
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -210,6 +226,107 @@ Reply in this exact JSON format:
 
 Be accurate and natural. If the input is Swedish, translate to English. If English, translate to Swedish.`
 };
+
+// --- Phrase of the Day endpoint ---
+app.get("/api/phrase-of-day", async (req, res) => {
+  const today = new Date().toISOString().split("T")[0];
+
+  const cached = db.prepare("SELECT * FROM phrase_of_day WHERE date = ?").get(today);
+  if (cached) return res.json(cached);
+
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 800,
+      system: `You are a Swedish language expert. Generate a "phrase of the day" — a commonly used Swedish phrase, idiom, or expression that would be very useful in daily life. Pick something that intermediate learners would find challenging but rewarding. Vary between idioms, colloquial expressions, formal phrases, and everyday sayings.
+
+Reply in this exact JSON format:
+{
+  "phrase": "<the Swedish phrase>",
+  "pronunciation": "<approximate pronunciation guide>",
+  "literal": "<literal word-for-word translation>",
+  "meaning": "<what it actually means in English>",
+  "context": "<when and how Swedes use this — 2-3 sentences>",
+  "example_swedish": "<an example sentence using the phrase>",
+  "example_english": "<English translation of the example>",
+  "difficulty": "intermediate" | "advanced"
+}`,
+      messages: [{ role: "user", content: `Generate a Swedish phrase of the day for ${today}. Make it a genuinely useful, commonly heard phrase.` }],
+    });
+
+    const text = response.content[0].text;
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
+    const data = JSON.parse(jsonMatch[1].trim());
+
+    db.prepare(`INSERT OR REPLACE INTO phrase_of_day (date, phrase, pronunciation, literal, meaning, context, example_swedish, example_english, difficulty)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      today, data.phrase, data.pronunciation, data.literal, data.meaning,
+      data.context, data.example_swedish, data.example_english, data.difficulty
+    );
+
+    res.json({ date: today, ...data });
+  } catch (err) {
+    console.error("Phrase of day error:", err.message);
+    res.status(500).json({ error: "Failed to generate phrase", detail: err.message });
+  }
+});
+
+// --- Daily Report endpoint ---
+app.get("/api/report", requireAuth, async (req, res) => {
+  const phrases = db.prepare("SELECT phrase, created_at FROM phrases WHERE user_id = ? ORDER BY created_at DESC").all(req.session.userId);
+  const mistakes = db.prepare("SELECT original, corrected, explanation, count, last_seen FROM mistakes WHERE user_id = ? ORDER BY count DESC").all(req.session.userId);
+  const today = new Date().toISOString().split("T")[0];
+  const potd = db.prepare("SELECT * FROM phrase_of_day WHERE date = ?").get(today);
+
+  if (mistakes.length === 0 && phrases.length === 0) {
+    return res.json({ report: null, message: "No data yet — start practicing first!" });
+  }
+
+  const mistakesSummary = mistakes.slice(0, 15).map((m) => `"${m.original}" → "${m.corrected}" (${m.count}x): ${m.explanation}`).join("\n");
+  const phrasesSummary = phrases.slice(0, 20).map((p) => p.phrase).join(", ");
+
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      system: `You are a Swedish language tutor writing a concise daily progress report for a student. The report should be printable on one page (front only). Be direct and useful — no fluff.
+
+Reply in this exact JSON format:
+{
+  "date": "${today}",
+  "summary_en": "<2-3 sentence overview of their progress and level in English>",
+  "summary_sv": "<same summary translated to Swedish>",
+  "top_mistakes": [
+    {"pattern": "<the grammatical/vocabulary pattern they keep getting wrong>", "explanation_en": "<clear explanation in English>", "explanation_sv": "<same explanation in Swedish>", "tip": "<one practical tip to fix it>"}
+  ],
+  "macro_analysis_en": "<1-2 paragraphs: what fundamental areas they struggle with on a macro level — e.g. word order, en/ett system, verb tenses, prepositions. Be specific about WHAT they're getting wrong and WHY>",
+  "macro_analysis_sv": "<same macro analysis in Swedish>",
+  "focus_areas": ["<3-5 specific things they should practice today>"],
+  "encouragement": "<one encouraging sentence about their progress>"
+}
+
+Keep top_mistakes to max 5 entries. Focus on patterns, not individual errors.`,
+      messages: [{
+        role: "user",
+        content: `Here are my mistakes (most frequent first):\n${mistakesSummary}\n\nPhrases I've learned:\n${phrasesSummary}\n\nGenerate my daily report.`
+      }],
+    });
+
+    const text = response.content[0].text;
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
+    const report = JSON.parse(jsonMatch[1].trim());
+
+    report.phrase_of_day = potd || null;
+    report.total_phrases = phrases.length;
+    report.total_mistakes = mistakes.length;
+    report.username = req.session.username;
+
+    res.json({ report });
+  } catch (err) {
+    console.error("Report error:", err.message);
+    res.status(500).json({ error: "Failed to generate report", detail: err.message });
+  }
+});
 
 app.post("/api/chat", async (req, res) => {
   const { mode, messages } = req.body;

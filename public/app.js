@@ -131,6 +131,7 @@ $$(".nav-btn").forEach((btn) => {
     const mode = btn.dataset.mode;
     $(`#panel-${mode}`).classList.add("active");
     if (mode === "stats") renderStats();
+    if (mode === "daily") loadPhraseOfDay();
   });
 });
 
@@ -430,6 +431,136 @@ $("#clear-mistakes").addEventListener("click", async () => {
   await fetch("/api/progress/mistakes", { method: "DELETE" });
   renderStatsData({ phrases: (await (await fetch("/api/progress")).json()).phrases, mistakes: [] });
 });
+
+// --- Phrase of the Day ---
+let potdLoaded = false;
+
+async function loadPhraseOfDay() {
+  if (potdLoaded) return;
+  const card = $("#potd-card");
+  try {
+    const res = await fetch("/api/phrase-of-day");
+    if (!res.ok) throw new Error("Failed to load");
+    const data = await res.json();
+    potdLoaded = true;
+
+    card.innerHTML = `
+      <div class="potd-phrase">${esc(data.phrase)}</div>
+      <div class="potd-pronunciation">${esc(data.pronunciation)}</div>
+      <div class="potd-row">
+        <div class="potd-label">Literal</div>
+        <div class="potd-value">${esc(data.literal)}</div>
+      </div>
+      <div class="potd-row">
+        <div class="potd-label">Meaning</div>
+        <div class="potd-value">${esc(data.meaning)}</div>
+      </div>
+      <div class="potd-row">
+        <div class="potd-label">When to use it</div>
+        <div class="potd-value">${esc(data.context)}</div>
+      </div>
+      <div class="potd-row">
+        <div class="potd-label">Example</div>
+        <div class="potd-value potd-swedish">${esc(data.example_swedish)}</div>
+        <div class="potd-value" style="font-size:0.85rem;color:var(--text-dim);font-style:italic">${esc(data.example_english)}</div>
+      </div>
+      <span class="potd-difficulty ${data.difficulty}">${data.difficulty}</span>
+    `;
+  } catch (err) {
+    card.innerHTML = `<p class="potd-loading">Could not load phrase: ${esc(err.message)}</p>`;
+  }
+}
+
+// --- Daily Report ---
+$("#btn-generate-report").addEventListener("click", async () => {
+  const btn = $("#btn-generate-report");
+  const preview = $("#report-preview");
+  btn.disabled = true;
+  btn.textContent = "Generating report...";
+  preview.classList.add("hidden");
+
+  try {
+    const res = await fetch("/api/report");
+    if (!res.ok) throw new Error("Failed to generate report");
+    const { report, message } = await res.json();
+
+    if (!report) {
+      preview.classList.remove("hidden");
+      preview.innerHTML = `<p style="color:var(--text-dim)">${esc(message)}</p>`;
+      return;
+    }
+
+    preview.classList.remove("hidden");
+    preview.innerHTML = buildReportHtml(report);
+  } catch (err) {
+    preview.classList.remove("hidden");
+    preview.innerHTML = `<p style="color:var(--red)">Error: ${esc(err.message)}</p>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Generate Daily Report";
+  }
+});
+
+function buildReportHtml(r) {
+  let html = `<div class="report-actions">
+    <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
+  </div>`;
+
+  html += `<div id="print-report">`;
+  html += `<h1>Svenska Tranaren — Daily Report</h1>`;
+  html += `<div class="print-meta">${esc(r.date)} | ${esc(r.username)} | ${r.total_phrases} phrases learned | ${r.total_mistakes} mistakes tracked</div>`;
+
+  // Phrase of the Day
+  if (r.phrase_of_day) {
+    const p = r.phrase_of_day;
+    html += `<div class="print-potd">
+      <h2>Phrase of the Day</h2>
+      <div class="phrase">${esc(p.phrase)}</div>
+      <div>${esc(p.meaning)}</div>
+      <div style="margin-top:4pt"><em>${esc(p.example_swedish)}</em></div>
+      <div style="color:#666">${esc(p.example_english)}</div>
+    </div>`;
+  }
+
+  // Summary
+  html += `<h2>Summary</h2>`;
+  html += `<p>${esc(r.summary_en)}</p>`;
+  html += `<p class="print-swedish">${esc(r.summary_sv)}</p>`;
+
+  // Macro Analysis
+  html += `<h2>What You're Getting Wrong (and Why)</h2>`;
+  html += `<p>${esc(r.macro_analysis_en)}</p>`;
+  html += `<p class="print-swedish">${esc(r.macro_analysis_sv)}</p>`;
+
+  // Top Mistakes
+  if (r.top_mistakes && r.top_mistakes.length > 0) {
+    html += `<h2>Recurring Mistake Patterns</h2>`;
+    for (const m of r.top_mistakes) {
+      html += `<div class="print-mistake">
+        <h3>${esc(m.pattern)}</h3>
+        <p>${esc(m.explanation_en)}</p>
+        <p class="print-swedish">${esc(m.explanation_sv)}</p>
+        <p><strong>Tip:</strong> ${esc(m.tip)}</p>
+      </div>`;
+    }
+  }
+
+  // Focus Areas
+  if (r.focus_areas && r.focus_areas.length > 0) {
+    html += `<h2>Today's Focus Areas</h2>`;
+    for (const f of r.focus_areas) {
+      html += `<div class="print-focus">• ${esc(f)}</div>`;
+    }
+  }
+
+  // Encouragement
+  if (r.encouragement) {
+    html += `<p style="margin-top:10pt;font-style:italic">${esc(r.encouragement)}</p>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
 
 // --- Init ---
 checkAuth();

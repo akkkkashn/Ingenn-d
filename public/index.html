@@ -51,6 +51,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>
         <span>Translate</span>
       </button>
+      <button class="nav-btn" data-mode="daily" title="Daily">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <span>Daily</span>
+      </button>
       <button class="nav-btn" data-mode="stats" title="Progress">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
         <span>Progress</span>
@@ -141,6 +145,28 @@
         <button class="send-btn" data-mode="translate">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         </button>
+      </div>
+    </section>
+
+    <!-- Daily: Phrase of the Day + Report -->
+    <section id="panel-daily" class="chat-panel">
+      <div class="chat-header">
+        <h2>Daily</h2>
+        <span class="header-hint">Phrase of the day & reports</span>
+      </div>
+      <div class="stats-content">
+        <div class="potd-section">
+          <h3>Phrase of the Day</h3>
+          <div id="potd-card" class="potd-card">
+            <p class="potd-loading">Loading today's phrase...</p>
+          </div>
+        </div>
+        <div class="report-section">
+          <h3>Daily Report</h3>
+          <p class="stats-hint">AI-generated analysis of your mistakes and progress. Printable.</p>
+          <button id="btn-generate-report" class="btn-primary btn-full">Generate Daily Report</button>
+          <div id="report-preview" class="report-preview hidden"></div>
+        </div>
       </div>
     </section>
 
