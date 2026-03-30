@@ -380,6 +380,108 @@ body {
 
 .btn-situation-inline:hover { border-color: var(--yellow); background: rgba(254,204,2,0.1); }
 
+/* Lab mode toggle */
+.lab-mode-bar {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 0.4rem 0.8rem;
+  gap: 0.3rem;
+}
+
+.lab-mode-btn {
+  flex: 1;
+  padding: 0.4rem;
+  background: var(--surface2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.lab-mode-btn:hover { color: var(--text); }
+.lab-mode-btn.active { color: var(--yellow); border-color: var(--yellow); background: rgba(254,204,2,0.08); }
+
+/* Explore word response */
+.explore-result { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.explore-word {
+  font-size: 1.4rem;
+  color: var(--yellow);
+  font-weight: 700;
+}
+
+.explore-meta {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.2rem;
+}
+
+.explore-type {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 8px;
+  background: rgba(0,106,167,0.2);
+  color: var(--accent-hover);
+  font-weight: 600;
+}
+
+.explore-formality {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.explore-formality.formal { background: rgba(0,106,167,0.15); color: var(--accent-hover); }
+.explore-formality.neutral { background: rgba(139,143,163,0.15); color: var(--text-dim); }
+.explore-formality.casual { background: rgba(254,204,2,0.15); color: var(--yellow); }
+.explore-formality.slang { background: rgba(251,146,60,0.15); color: var(--orange); }
+
+.explore-example {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+}
+
+.explore-example .ex-sv { color: var(--yellow); font-weight: 500; }
+.explore-example .ex-en { color: var(--text-dim); font-size: 0.85rem; font-style: italic; }
+.explore-example .ex-ctx { color: var(--text-dim); font-size: 0.75rem; margin-top: 0.15rem; }
+
+.explore-combos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.explore-combo {
+  display: inline-block;
+  background: rgba(0,106,167,0.15);
+  color: var(--accent-hover);
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.78rem;
+}
+
+.explore-variation {
+  font-size: 0.85rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.explore-variation:last-child { border-bottom: none; }
+.explore-variation .var-form { color: var(--yellow); font-weight: 500; }
+.explore-variation .var-meaning { color: var(--text-dim); font-size: 0.8rem; }
+
 /* Lab context bar */
 .lab-context-bar {
   padding: 0.5rem 0.8rem 0.3rem;

@@ -6,6 +6,7 @@ let currentSituation = "";
 let cachedPhraseTranslations = {};
 let labContext = "none";
 let labImageData = null;
+let labMode = "translate"; // "translate" or "explore"
 
 // --- DOM ---
 const $ = (sel) => document.querySelector(sel);
@@ -108,6 +109,21 @@ $$(".nav-btn").forEach((btn) => {
     $(`#panel-${mode}`).classList.add("active");
     if (mode === "stats") renderStats();
     if (mode === "daily") loadPhraseOfDay();
+  });
+});
+
+// --- Lab mode toggle ---
+$$(".lab-mode-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    $$(".lab-mode-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    labMode = btn.dataset.labmode;
+    // Hide context bar in explore mode (not relevant)
+    $("#lab-context-bar").style.display = labMode === "explore" ? "none" : "";
+    // Update placeholder
+    $("#input-lab").placeholder = labMode === "explore"
+      ? "Type a word or phrase you heard..."
+      : "Write in Swedish or English...";
   });
 });
 
@@ -243,6 +259,17 @@ async function handleSend(mode) {
         }
       }
     } else if (mode === "lab") {
+      // Route to explore or translate
+      if (labMode === "explore") {
+        const data = await apiChat("lab-explore", [{ role: "user", content: userText }]);
+        if (data.raw) {
+          addBubble(msgsId, "assistant", data.raw);
+        } else {
+          renderExploreResponse(msgsId, data);
+          saveProgress(data.stolen_phrases, null);
+        }
+        return;
+      }
       const extra = { labContext };
       if (labImageData) {
         extra.imageData = labImageData;
@@ -411,6 +438,60 @@ function renderSituationResponse(msgsId, data) {
     html += phraseTags(data.stolen_phrases);
   }
 
+  addRichBubble(msgsId, html);
+}
+
+function renderExploreResponse(msgsId, data) {
+  let html = `<div class="explore-result">`;
+
+  html += `<div class="explore-word">${esc(data.word)}</div>`;
+  html += `<div class="explore-meta">
+    <span class="explore-type">${esc(data.type)}</span>
+    ${data.formality ? `<span class="explore-formality ${data.formality}">${esc(data.formality)}</span>` : ""}
+    ${data.pronunciation ? `<span style="color:var(--text-dim);font-size:0.8rem;font-style:italic">${esc(data.pronunciation)}</span>` : ""}
+  </div>`;
+
+  html += `<div style="font-size:0.95rem;margin-bottom:0.2rem">${esc(data.meaning)}</div>`;
+
+  // Examples
+  if (data.examples && data.examples.length > 0) {
+    html += `<div class="label">Examples</div>`;
+    for (const ex of data.examples) {
+      html += `<div class="explore-example">
+        <div class="ex-sv">${esc(ex.swedish)}</div>
+        <div class="ex-en">${esc(ex.english)}</div>
+        <div class="ex-ctx">${esc(ex.context)}</div>
+      </div>`;
+    }
+  }
+
+  // Common combos
+  if (data.common_combos && data.common_combos.length > 0) {
+    html += `<div class="label">Common combos</div>`;
+    html += `<div class="explore-combos">${data.common_combos.map((c) =>
+      `<span class="explore-combo">${esc(c)}</span>`
+    ).join("")}</div>`;
+  }
+
+  // Variations
+  if (data.variations && data.variations.length > 0) {
+    html += `<div class="label">Forms / Variations</div>`;
+    for (const v of data.variations) {
+      html += `<div class="explore-variation"><span class="var-form">${esc(v.form)}</span> <span class="var-meaning">${esc(v.meaning)}</span></div>`;
+    }
+  }
+
+  // Culture note
+  if (data.culture_note) {
+    html += `<div class="note">${esc(data.culture_note)}</div>`;
+  }
+
+  // Phrases
+  if (data.stolen_phrases && data.stolen_phrases.length > 0) {
+    html += phraseTags(data.stolen_phrases);
+  }
+
+  html += `</div>`;
   addRichBubble(msgsId, html);
 }
 

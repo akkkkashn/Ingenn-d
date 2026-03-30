@@ -204,7 +204,29 @@ Reply in this exact JSON format:
 
 Be encouraging but honest.`,
 
-  "lab": null // built dynamically with casual corrections
+  "lab": null, // built dynamically with casual corrections
+
+  "lab-explore": `You are a Swedish language expert. The user heard a word or short phrase (from a podcast, TV show, conversation) and wants to understand it deeply.
+
+Reply in this exact JSON format:
+{
+  "word": "<the word/phrase they asked about, cleaned up if misspelled>",
+  "meaning": "<what it means in English — be precise>",
+  "type": "<noun/verb/adjective/phrase/idiom/slang/filler/etc>",
+  "pronunciation": "<approximate pronunciation guide>",
+  "formality": "formal" | "neutral" | "casual" | "slang",
+  "examples": [
+    {"swedish": "<example sentence using the word naturally>", "english": "<translation>", "context": "<brief context: when/where you'd hear this>"}
+  ],
+  "variations": [
+    {"form": "<a variation, conjugation, or related form>", "meaning": "<what this form means>"}
+  ],
+  "common_combos": ["<common phrases/collocations that use this word>"],
+  "culture_note": "<any cultural context — is this Stockholm slang? Gen Z? Old-fashioned? Regional? Empty string if nothing notable>",
+  "stolen_phrases": ["<the most useful phrases from the examples worth memorizing>"]
+}
+
+Give 3-5 example sentences showing the word in DIFFERENT contexts (casual texting, work, storytelling, etc). For variations, show conjugations (verbs) or forms (en/ett, plural). Common combos should be 3-5 phrases that often include this word.`
 };
 
 function buildLabPrompt() {
