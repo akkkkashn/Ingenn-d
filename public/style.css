@@ -380,6 +380,96 @@ body {
 
 .btn-situation-inline:hover { border-color: var(--yellow); background: rgba(254,204,2,0.1); }
 
+/* Lab context bar */
+.lab-context-bar {
+  padding: 0.5rem 0.8rem 0.3rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.context-modes {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.context-btn {
+  padding: 0.25rem 0.65rem;
+  background: var(--surface2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.context-btn:hover { color: var(--text); border-color: var(--text-dim); }
+.context-btn.active { color: var(--yellow); border-color: var(--yellow); background: rgba(254,204,2,0.08); }
+
+/* Image upload */
+.img-upload-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0.4rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.img-upload-btn:hover { color: var(--text); background: var(--surface2); }
+
+.lab-image-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--surface2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.lab-image-preview img {
+  height: 36px;
+  width: auto;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.lab-image-preview .btn-tiny { color: var(--text-dim); font-size: 1rem; }
+
+/* Add phrase form */
+.add-phrase-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+
+.add-phrase-form input {
+  flex: 1;
+  padding: 0.45rem 0.7rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.add-phrase-form input:focus { outline: none; border-color: var(--accent); }
+
+.btn-add { color: var(--green); border-color: var(--green); }
+.btn-add:hover { background: rgba(52,211,153,0.1); }
+
 /* Lab formal/casual cards */
 .lab-result {
   display: flex;

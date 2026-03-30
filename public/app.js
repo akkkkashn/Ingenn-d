@@ -4,6 +4,8 @@ const chatHistory = [];
 let awaitingSituationResponse = false;
 let currentSituation = "";
 let cachedPhraseTranslations = {};
+let labContext = "none";
+let labImageData = null;
 
 // --- DOM ---
 const $ = (sel) => document.querySelector(sel);
@@ -109,6 +111,36 @@ $$(".nav-btn").forEach((btn) => {
   });
 });
 
+// --- Lab context modes ---
+$$(".context-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    $$(".context-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    labContext = btn.dataset.context;
+  });
+});
+
+// --- Lab image upload ---
+$("#lab-image-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const base64 = reader.result.split(",")[1];
+    labImageData = { type: file.type, data: base64 };
+    $("#lab-image-thumb").src = reader.result;
+    $("#lab-image-preview").classList.remove("hidden");
+  };
+  reader.readAsDataURL(file);
+});
+
+$("#lab-image-remove").addEventListener("click", () => {
+  labImageData = null;
+  $("#lab-image-input").value = "";
+  $("#lab-image-preview").classList.add("hidden");
+});
+
 // --- Situation button in chat header ---
 $("#btn-situation").addEventListener("click", async () => {
   $("#loading-overlay").classList.remove("hidden");
@@ -150,13 +182,13 @@ $$(".chat-input-bar textarea").forEach((ta) => {
 });
 
 // --- API ---
-async function apiChat(mode, messages) {
+async function apiChat(mode, messages, extra = {}) {
   $("#loading-overlay").classList.remove("hidden");
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode, messages }),
+      body: JSON.stringify({ mode, messages, ...extra }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -176,7 +208,10 @@ async function handleSend(mode) {
   if (!userText) return;
 
   const msgsId = `msgs-${mode}`;
-  addBubble(msgsId, "user", userText);
+  // Don't add user bubble for lab if image attached (handled in lab block)
+  if (!(mode === "lab" && labImageData)) {
+    addBubble(msgsId, "user", userText);
+  }
   input.value = "";
   input.style.height = "auto";
 
@@ -208,7 +243,28 @@ async function handleSend(mode) {
         }
       }
     } else if (mode === "lab") {
-      const data = await apiChat("lab", [{ role: "user", content: userText }]);
+      const extra = { labContext };
+      if (labImageData) {
+        extra.imageData = labImageData;
+        // Show image in chat
+        const imgBubble = document.createElement("div");
+        imgBubble.className = "bubble user";
+        imgBubble.innerHTML = `<img src="data:${labImageData.type};base64,${labImageData.data}" style="max-width:200px;border-radius:8px;margin-bottom:0.3rem"><br>${esc(userText)}`;
+        $(`#${msgsId}`).appendChild(imgBubble);
+        // Clear image after sending
+        labImageData = null;
+        $("#lab-image-input").value = "";
+        $("#lab-image-preview").classList.add("hidden");
+      }
+      if (labContext !== "none") {
+        // Show context badge in chat
+        const badge = document.createElement("div");
+        badge.className = "bubble system";
+        badge.style.cssText = "font-size:0.75rem;padding:0.3rem 0.6rem";
+        badge.textContent = `Context: ${labContext}`;
+        $(`#${msgsId}`).appendChild(badge);
+      }
+      const data = await apiChat("lab", [{ role: "user", content: userText }], extra);
       if (data.raw) {
         addBubble(msgsId, "assistant", data.raw);
       } else {
@@ -469,6 +525,35 @@ $("#clear-mistakes").addEventListener("click", async () => {
   await fetch("/api/progress/mistakes", { method: "DELETE" });
   const data = await (await fetch("/api/progress")).json();
   renderStatsData({ phrases: data.phrases, mistakes: [] });
+});
+
+// --- Add phrase manually ---
+$("#add-phrase-btn").addEventListener("click", () => {
+  $("#add-phrase-form").classList.remove("hidden");
+  $("#add-phrase-input").focus();
+});
+
+$("#add-phrase-cancel").addEventListener("click", () => {
+  $("#add-phrase-form").classList.add("hidden");
+  $("#add-phrase-input").value = "";
+});
+
+$("#add-phrase-submit").addEventListener("click", async () => {
+  const phrase = $("#add-phrase-input").value.trim();
+  if (!phrase) return;
+  await fetch("/api/progress/phrases", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phrases: [phrase] }),
+  });
+  $("#add-phrase-input").value = "";
+  $("#add-phrase-form").classList.add("hidden");
+  loadProgress();
+});
+
+$("#add-phrase-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("#add-phrase-submit").click();
+  if (e.key === "Escape") $("#add-phrase-cancel").click();
 });
 
 // --- Phrase of the Day ---

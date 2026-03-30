@@ -425,12 +425,63 @@ app.delete("/api/progress/phrases/:phrase", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/chat", async (req, res) => {
-  const { mode, messages } = req.body;
+// Increase JSON body limit for base64 images
+app.use("/api/chat", express.json({ limit: "10mb" }));
 
-  const systemPrompt = mode === "lab" ? buildLabPrompt() : SYSTEM_PROMPTS[mode];
+const CONTEXT_MODIFIERS = {
+  "none": "",
+  "flirty": `\n\nCONTEXT: The user is in a flirty/dating context (texting someone they like, Tinder, etc). The casual version should be:
+- Confident but not desperate
+- Playful, teasing, a bit cheeky
+- Nonchalant — cool without trying too hard
+- NOT cringy pickup lines, NOT over-the-top
+- Think: smooth, laid-back, "I'm interested but I'm not sweating it"
+- Swedish flirting is subtle — less is more`,
+  "work": `\n\nCONTEXT: Work/professional context (texting colleagues, work group chat). The casual version should be:
+- Professional but human — not robotic
+- Friendly tone, like you'd text a colleague you get along with
+- Swedish workplaces are informal — first names, not titles
+- Use "du" freely, keep it direct but warm
+- OK to use light humor, but skip slang/swearing`,
+  "friend": `\n\nCONTEXT: Texting a close friend. The casual version should be:
+- Maximum casual — zero filter
+- Inside-joke energy, abbreviated, messy grammar is fine
+- Emojis/reactions implied in tone
+- The kind of message you send without re-reading it first`,
+};
+
+app.post("/api/chat", async (req, res) => {
+  const { mode, messages, labContext, imageData } = req.body;
+
+  let systemPrompt = mode === "lab" ? buildLabPrompt() : SYSTEM_PROMPTS[mode];
   if (!systemPrompt) {
     return res.status(400).json({ error: "Invalid mode" });
+  }
+
+  // Add context modifier for lab mode
+  if (mode === "lab" && labContext && CONTEXT_MODIFIERS[labContext]) {
+    systemPrompt += CONTEXT_MODIFIERS[labContext];
+  }
+
+  // If image is attached, add context instruction
+  if (imageData) {
+    systemPrompt += "\n\nThe user has attached a screenshot for context. Look at it to understand the tone, platform, and situation. Use this visual context to make your response more accurate and natural.";
+  }
+
+  // Build messages with possible image content
+  let apiMessages = messages;
+  if (imageData && messages.length > 0) {
+    const lastMsg = messages[messages.length - 1];
+    apiMessages = [
+      ...messages.slice(0, -1),
+      {
+        role: lastMsg.role,
+        content: [
+          { type: "image", source: { type: "base64", media_type: imageData.type, data: imageData.data } },
+          { type: "text", text: lastMsg.content },
+        ],
+      },
+    ];
   }
 
   try {
@@ -438,7 +489,7 @@ app.post("/api/chat", async (req, res) => {
       model: "claude-sonnet-4-20250514",
       max_tokens: 1500,
       system: systemPrompt,
-      messages: messages,
+      messages: apiMessages,
     });
 
     const text = response.content[0].text;

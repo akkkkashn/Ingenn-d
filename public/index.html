@@ -78,7 +78,23 @@
         <span class="header-hint">Translate, correct, rewrite — formal & slang</span>
       </div>
       <div class="chat-messages" id="msgs-lab"></div>
+      <div class="lab-context-bar">
+        <div class="context-modes">
+          <button class="context-btn active" data-context="none">Default</button>
+          <button class="context-btn" data-context="flirty">Flirty</button>
+          <button class="context-btn" data-context="work">Work</button>
+          <button class="context-btn" data-context="friend">Friend</button>
+        </div>
+        <div id="lab-image-preview" class="lab-image-preview hidden">
+          <img id="lab-image-thumb" src="" alt="context">
+          <button id="lab-image-remove" class="btn-tiny">&times;</button>
+        </div>
+      </div>
       <div class="chat-input-bar">
+        <label class="img-upload-btn" title="Add screenshot for context">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <input type="file" id="lab-image-input" accept="image/*" hidden>
+        </label>
         <textarea id="input-lab" placeholder="Write in Swedish or English..." rows="1"></textarea>
         <button class="send-btn" data-mode="lab">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -119,10 +135,16 @@
           <div class="stats-header-row">
             <h3>Stolen Phrases <span id="phrase-count" class="badge">0</span></h3>
             <div class="stats-actions">
+              <button id="add-phrase-btn" class="btn-ghost btn-tiny btn-add">+ Add</button>
               <button id="select-all-phrases" class="btn-ghost btn-tiny">Select All</button>
               <button id="delete-selected-phrases" class="btn-ghost btn-tiny btn-danger">Delete Selected</button>
               <button id="clear-phrases" class="btn-ghost btn-tiny">Clear All</button>
             </div>
+          </div>
+          <div id="add-phrase-form" class="add-phrase-form hidden">
+            <input type="text" id="add-phrase-input" placeholder="Type a Swedish phrase...">
+            <button id="add-phrase-submit" class="btn-primary btn-small">Add</button>
+            <button id="add-phrase-cancel" class="btn-ghost btn-tiny">Cancel</button>
           </div>
           <div id="stolen-phrases-list" class="stats-list"></div>
         </div>
